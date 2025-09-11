@@ -1,0 +1,8 @@
+﻿<resources xmlns:tools="http://schemas.android.com/tools">
+    <style name="Base.Theme.SmartSmsFilter" parent="Theme.AppCompat.DayNight">
+        <!-- Customize your light theme here. -->
+        <!-- <item name="colorPrimary">@color/my_light_primary</item> -->
+    </style>
+    
+    <style name="Theme.SmartSmsFilter" parent="Base.Theme.SmartSmsFilter" />
+</resources>
