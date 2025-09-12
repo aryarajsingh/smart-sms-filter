@@ -10,7 +10,7 @@ plugins {
 ext {
     compileSdk = 34
     minSdk = 24
-    targetSdk = 34
+    targetSdk = 33  // Android 13 for better compatibility
     
     // Dependency versions
     composeVersion = '1.5.10'

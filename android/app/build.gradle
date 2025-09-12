@@ -13,13 +13,19 @@ android {
     signingConfigs {
         release {
             def keystorePropertiesFile = rootProject.file('keystore.properties')
-            def keystoreProperties = new Properties()
-            keystoreProperties.load(new FileInputStream(keystorePropertiesFile))
+            if (keystorePropertiesFile.exists()) {
+                def keystoreProperties = new Properties()
+                keystoreProperties.load(new FileInputStream(keystorePropertiesFile))
 
-            storeFile rootProject.file(keystoreProperties['storeFile'])
-            storePassword keystoreProperties['storePassword']
-            keyAlias keystoreProperties['keyAlias']
-            keyPassword keystoreProperties['keyPassword']
+                storeFile rootProject.file(keystoreProperties['storeFile'])
+                storePassword keystoreProperties['storePassword']
+                keyAlias keystoreProperties['keyAlias']
+                keyPassword keystoreProperties['keyPassword']
+                
+                println "Release signing configuration loaded: ${keystoreProperties['storeFile']}"
+            } else {
+                throw new GradleException("keystore.properties file not found for release signing")
+            }
         }
     }
 
@@ -27,23 +33,28 @@ android {
         applicationId "com.smartsmsfilter"
         minSdk rootProject.minSdk
         targetSdk rootProject.targetSdk
-        versionCode 5
-        versionName "1.2.1" // Security and performance overhaul release
+        versionCode 7  // Compatibility and size optimization release
+        versionName "1.2.2" // Compatibility and size optimization release
 
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
         vectorDrawables {
             useSupportLibrary true
         }
-
-        // TensorFlow Lite model configuration
-        aaptOptions {
-            noCompress "tflite"
+        
+        // Support all CPU architectures
+        ndk {
+            abiFilters 'armeabi-v7a', 'arm64-v8a', 'x86', 'x86_64'
         }
+
+        // TensorFlow Lite model configuration - Temporarily disabled
+        // aaptOptions {
+        //     noCompress "tflite"
+        // }
     }
 
     buildTypes {
         release {
-            minifyEnabled true
+            minifyEnabled false
             proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
             signingConfig signingConfigs.release
         }
@@ -74,6 +85,19 @@ android {
     packagingOptions {
         resources {
             excludes += '/META-INF/{AL2.0,LGPL2.1}'
+        }
+        // Fix for duplicate files
+        pickFirst 'lib/x86/libc++_shared.so'
+        pickFirst 'lib/x86_64/libc++_shared.so'
+        pickFirst 'lib/arm64-v8a/libc++_shared.so'
+        pickFirst 'lib/armeabi-v7a/libc++_shared.so'
+    }
+    
+    // Generate universal APK for compatibility
+    splits {
+        abi {
+            enable false
+            universalApk true
         }
     }
 }
@@ -116,10 +140,10 @@ dependencies {
     implementation 'androidx.datastore:datastore-preferences:1.0.0'
     implementation 'androidx.datastore:datastore-core:1.0.0'
     
-    // TensorFlow Lite for AI Model
-    implementation 'org.tensorflow:tensorflow-lite:' + rootProject.tensorflowLiteVersion
-    implementation 'org.tensorflow:tensorflow-lite-support:0.4.4'
-    implementation 'org.tensorflow:tensorflow-lite-metadata:0.4.4'
+    // TensorFlow Lite for AI Model - Temporarily disabled for compatibility
+    // implementation 'org.tensorflow:tensorflow-lite:' + rootProject.tensorflowLiteVersion
+    // implementation 'org.tensorflow:tensorflow-lite-support:0.4.4'
+    // implementation 'org.tensorflow:tensorflow-lite-metadata:0.4.4'
     
     // Permissions
     implementation 'com.google.accompanist:accompanist-permissions:0.32.0'
@@ -136,7 +160,7 @@ dependencies {
     
     androidTestImplementation 'androidx.test.ext:junit:1.1.5'
     androidTestImplementation 'androidx.test.espresso:espresso-core:3.5.1'
-    androidTestImplementation platform('androidx.compose:compose-bom:2023.10.01')
+    androidTestImplementation platform('androidx.compose:compose-bom:2024.02.01')
     androidTestImplementation 'androidx.compose.ui:ui-test-junit4'
     
     debugImplementation 'androidx.compose.ui:ui-tooling'
