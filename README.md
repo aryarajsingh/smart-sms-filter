@@ -32,10 +32,10 @@ The average smartphone user in India receives a high volume of unsolicited SMS m
 ## Technical Architecture
 
 ### Android Implementation
-- **Framework**: Spam and Call protection service (not default SMS app)
+- **SMS Role**: Default SMS app (Android 4.4+; RoleManager on Android 10+) for real-time deliver/processing
 - **UI**: Kotlin + Jetpack Compose
-- **Architecture**: MVVM with Clean Architecture + Room Database
-- **AI**: TensorFlow Lite for on-device classification
+- **Architecture**: Clean Architecture (MVVM) + Room Database
+- **Notifications**: Important vs. normal vs. silent channels; OTPs are never silent
 - **Minimum SDK**: API 24 (Android 7.0)
 - **Target SDK**: API 34 (Android 14)
 
@@ -84,12 +84,14 @@ smart-sms-filter/
 ## Roadmap
 
 ### Version 1.1.0 (Current - Android)
-- ✅ Android SMS filtering service implementation
+- ✅ Android SMS filtering service implementation (default SMS role support and banner)
 - ✅ Rule-based classification with user preferences integration
-- ✅ Three-category system (Inbox, Filtered, Needs Review)
+- ✅ Three-category system (Inbox, Spam/Promo, Needs Review)
 - ✅ Premium Welcome Screen with value proposition
-- ✅ Enhanced Onboarding Flow with user preference collection
-- ✅ Premium iOS-inspired UI with dynamic theming
+- ✅ Premium Onboarding (legacy onboarding removed)
+- ✅ Settings screen (Theme mode, Filtering strength, Important types, Learning toggle)
+- ✅ Explainability: “Why?” bottom sheet with classification audit reasons
+- ✅ Notifications refined; OTPs are never silent
 - ✅ Jetpack Compose modern UI with refined typography and spacing
 - 🚧 TensorFlow Lite AI model (architecture ready, not yet integrated)
 
@@ -121,11 +123,11 @@ This project is actively developed with AI assistance (Warp/Claude). Key context
 - **Version**: 1.1.0 (versionCode: 2)
 
 ### Recent Achievements
-- Fixed MainActivity smart casting and WelcomeScreen import issues
-- Enhanced onboarding with progress headers and better UX
-- Integrated user preferences into classification logic
-- Replaced inappropriate "iMessage" placeholder text
-- Added premium Welcome Screen with spring animations
+- Settings screen with Theme mode and filtering preferences (persisted via DataStore)
+- Explainability “Why?” bottom sheet powered by classification audit table
+- Refined notification policy: OTPs always high-priority (never silent)
+- Default SMS app role detection and user prompt flow improvements
+- Premium Welcome Screen and Onboarding polish (legacy onboarding removed)
 
 ### Next Steps
 - Continue UI polish: bottom tab navigation, translucency effects

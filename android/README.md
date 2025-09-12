@@ -2,7 +2,7 @@
 
 ## Overview
 
-The Android implementation of Smart SMS Filter uses the **Spam and Call Protection** service framework to filter SMS messages without needing to be the default messaging app.
+Smart SMS Filter is a privacy-first SMS inbox. It organizes messages into Inbox, Spam, and Needs Review — on-device, in real time. It becomes the default SMS app (Android 4.4+) or requests the SMS role via RoleManager (Android 10+) to enable classification, notifications, and full functionality.
 
 ## Technical Stack
 
@@ -33,20 +33,37 @@ android/
 
 ## Key Features
 
+### Welcome and onboarding
+- Calm, explanatory welcome: learn what the app does before any prompts
+- Privacy pledge: all processing on-device; no data leaves your phone
+- Request permissions and default SMS only after rationale
+
 ### SMS Filtering Service
-- Implements `CallScreeningService` for spam protection
-- Real-time SMS classification using TFLite model
-- No need to be default SMS app
+- Real-time SMS classification using rule-based + contextual models (TFLite planned)
+- Default SMS app requirement (Android 4.4+; RoleManager on Android 10+)
+- Privacy-first: on-device processing
 
 ### Three-Category System
-1. **Inbox**: Important messages (OTPs, bank alerts, personal)
-2. **Filtered**: Spam and promotional messages (silenced)
+1. **Inbox**: Important messages (OTPs, banking, personal; trusted senders pinned to Inbox)
+2. **Filtered (Spam/Promo)**: Promotional and suspected spam (delivered silently)
 3. **Needs Review**: Uncertain classifications for user review
+
+### Explainability and corrections
+- "Why?" dialog with meaningful reasons (manual overrides, sender prefs, OTP rule, contextual hints)
+- Correction actions (Move to Inbox / Mark Spam) with quick reason chips; undo supported
+- Feedback audit logged for future improvements
 
 ### On-Device AI
 - Gemma 2B model (4-bit quantized)
 - 100% local processing - no data sent to servers
 - Continuous learning from user feedback
+
+## UI System
+
+- Premium composer bar: rounded input, accessible send button
+- Subtle list micro-animations (fade/scale) for item changes
+- AutoMirrored icons for RTL support and to avoid deprecated icons
+- Normalized paddings/typography for a calm, consistent feel
 
 ## Development Setup
 
@@ -63,20 +80,13 @@ android/
 4. Add TFLite model to `app/src/main/assets/`
 5. Run on device with API 24+
 
-## Permissions Required
+## Permissions & Roles
 
-### Essential Permissions
-```xml
-<!-- SMS filtering -->
-<uses-permission android:name="android.permission.RECEIVE_SMS" />
-<uses-permission android:name="android.permission.READ_SMS" />
-
-<!-- Call screening service -->
-<uses-permission android:name="android.permission.ANSWER_PHONE_CALLS" />
-
-<!-- Notifications -->
-<uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
-```
+The app requests permissions and default SMS role only after explaining why. Essentials include:
+- RECEIVE_SMS, READ_SMS, SEND_SMS
+- READ_CONTACTS
+- POST_NOTIFICATIONS (Android 13+)
+- Default SMS role via RoleManager (Android 10+) or Telephony API (Android 4.4–9)
 
 ## Architecture Details
 
@@ -87,10 +97,12 @@ android/
 - **Data Layer**: Repository pattern with Room database
 
 ### Key Components
-- `SmsFilterService`: Main filtering service
-- `MessageClassifier`: TFLite model wrapper
+- `DefaultSmsAppHelper`: Handles default SMS app role detection/prompt
+- `SmartNotificationManager`: Channel routing (important/normal/silent); OTPs never silent
+- `ClassificationAuditDao`: Persists classification reasons for explainability
+- `MessageClassifier`: (planned TFLite wrapper)
 - `MessageRepository`: Data access layer
-- `FilterViewModel`: UI state management
+- `FilterViewModel`/`SmsViewModel`: UI state management
 
 ## Build Variants
 
@@ -156,7 +168,7 @@ Model specifications:
 
 ## Known Issues
 
-- None currently documented
+- None currently documented. Please see CHANGELOG.md for recent fixes.
 
 ## Future Enhancements
 

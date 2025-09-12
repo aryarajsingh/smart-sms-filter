@@ -15,6 +15,7 @@ import kotlinx.coroutines.launch
 import java.util.Date
 import javax.inject.Inject
 
+@OptIn(kotlinx.coroutines.FlowPreview::class, kotlinx.coroutines.ExperimentalCoroutinesApi::class)
 @HiltViewModel
 class ComposeMessageViewModel @Inject constructor(
     private val smsSenderManager: SmsSenderManager,
@@ -91,7 +92,7 @@ class ComposeMessageViewModel @Inject constructor(
                 )
                 
                 result.fold(
-                    onSuccess = { status ->
+onSuccess = { _ ->
                         // Save sent message to database
                         val sentMessage = SmsMessage(
                             sender = "You", // Indicates outgoing message

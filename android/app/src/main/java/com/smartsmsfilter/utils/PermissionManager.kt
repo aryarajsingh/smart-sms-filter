@@ -10,7 +10,8 @@ object PermissionManager {
     val SMS_PERMISSIONS = arrayOf(
         Manifest.permission.RECEIVE_SMS,
         Manifest.permission.READ_SMS,
-        Manifest.permission.SEND_SMS
+        Manifest.permission.SEND_SMS,
+        Manifest.permission.RECEIVE_MMS
     )
     
     val NOTIFICATION_PERMISSIONS = arrayOf(

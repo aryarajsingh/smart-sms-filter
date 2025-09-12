@@ -7,13 +7,15 @@ import android.content.Context
 import com.smartsmsfilter.data.model.SmsMessageEntity
 
 @Database(
-    entities = [SmsMessageEntity::class],
-    version = 1,
+    entities = [SmsMessageEntity::class, SenderPreferencesEntity::class, ClassificationAuditEntity::class],
+    version = 2,
     exportSchema = false
 )
 abstract class SmsDatabase : RoomDatabase() {
     
     abstract fun smsMessageDao(): SmsMessageDao
+    abstract fun senderPreferencesDao(): SenderPreferencesDao
+    abstract fun classificationAuditDao(): ClassificationAuditDao
     
     companion object {
         const val DATABASE_NAME = "sms_filter_database"

@@ -14,7 +14,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.smartsmsfilter.domain.model.MessageCategory
 import com.smartsmsfilter.domain.model.SmsMessage
-import java.text.SimpleDateFormat
+import com.smartsmsfilter.ui.utils.formatRelativeTime
 import java.util.*
 
 @Composable
@@ -103,7 +103,7 @@ private fun MessageItem(
                         overflow = TextOverflow.Ellipsis
                     )
                     Text(
-                        text = formatTimestamp(message.timestamp),
+                        text = formatRelativeTime(message.timestamp),
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
@@ -126,9 +126,9 @@ private fun MessageItem(
                             }
                         )
                         DropdownMenuItem(
-                            text = { Text("Move to Filtered") },
+                            text = { Text("Move to Spam") },
                             onClick = {
-                                onMoveToCategory(MessageCategory.FILTERED)
+                                onMoveToCategory(MessageCategory.SPAM)
                                 showMenu = false
                             }
                         )
@@ -174,7 +174,7 @@ private fun CategoryChip(
 ) {
     val (text, color) = when (category) {
         MessageCategory.INBOX -> "Inbox" to MaterialTheme.colorScheme.primary
-        MessageCategory.FILTERED -> "Filtered" to MaterialTheme.colorScheme.error
+        MessageCategory.SPAM -> "Spam" to MaterialTheme.colorScheme.error
         MessageCategory.NEEDS_REVIEW -> "Review" to MaterialTheme.colorScheme.secondary
     }
     
@@ -192,19 +192,3 @@ private fun CategoryChip(
     }
 }
 
-private fun formatTimestamp(date: Date): String {
-    val now = Calendar.getInstance()
-    val messageDate = Calendar.getInstance().apply { time = date }
-    
-    return when {
-        now.get(Calendar.DATE) == messageDate.get(Calendar.DATE) -> {
-            SimpleDateFormat("HH:mm", Locale.getDefault()).format(date)
-        }
-        now.get(Calendar.WEEK_OF_YEAR) == messageDate.get(Calendar.WEEK_OF_YEAR) -> {
-            SimpleDateFormat("EEE HH:mm", Locale.getDefault()).format(date)
-        }
-        else -> {
-            SimpleDateFormat("MMM dd", Locale.getDefault()).format(date)
-        }
-    }
-}

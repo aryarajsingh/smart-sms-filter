@@ -5,9 +5,9 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.ArrowBack
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Person
-import androidx.compose.material.icons.filled.Send
+import androidx.compose.material.icons.automirrored.filled.Send
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -20,6 +20,7 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.smartsmsfilter.data.contacts.Contact
 import com.smartsmsfilter.presentation.viewmodel.ComposeMessageViewModel
+import com.smartsmsfilter.ui.components.PremiumComposerBar
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -30,27 +31,34 @@ fun ComposeMessageScreen(
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     val contacts by viewModel.filteredContacts.collectAsStateWithLifecycle()
-    
+    val snackbarHostState = remember { SnackbarHostState() }
+    val haptics = androidx.compose.ui.platform.LocalHapticFeedback.current
+
     // Set initial recipient if provided
     LaunchedEffect(selectedContact) {
         selectedContact?.let { contact ->
             viewModel.setRecipient(contact)
         }
     }
-    
-    Column(
-        modifier = Modifier.fillMaxSize()
-    ) {
-        // Top App Bar
-        TopAppBar(
-            title = { Text("New message") },
-            navigationIcon = {
-                IconButton(onClick = onNavigateBack) {
-                    Icon(Icons.Default.ArrowBack, contentDescription = "Back")
+
+    Scaffold(
+        topBar = {
+            TopAppBar(
+                title = { Text("New message") },
+                navigationIcon = {
+                    IconButton(onClick = onNavigateBack) {
+Icon(imageVector = Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
+                    }
                 }
-            }
-        )
-        
+            )
+        },
+        snackbarHost = { SnackbarHost(hostState = snackbarHostState) }
+    ) { innerPadding ->
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(innerPadding)
+        ) {
         // Recipient Section
         Card(
             modifier = Modifier
@@ -74,7 +82,7 @@ fun ComposeMessageScreen(
                     modifier = Modifier.fillMaxWidth(),
                     placeholder = { Text("Enter phone number or contact name") },
                     leadingIcon = {
-                        Icon(Icons.Default.Person, contentDescription = null)
+Icon(imageVector = Icons.AutoMirrored.Filled.Send, contentDescription = "Send")
                     },
                     keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Text),
                     singleLine = true
@@ -119,11 +127,17 @@ fun ComposeMessageScreen(
         
         // Contact suggestions (shown when typing and no recipient selected)
         if (uiState.selectedRecipient == null && uiState.recipientQuery.isNotBlank() && contacts.isNotEmpty()) {
+            Text(
+                text = "Suggestions",
+                style = MaterialTheme.typography.titleMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.padding(horizontal = 16.dp)
+            )
             LazyColumn(
                 modifier = Modifier
                     .fillMaxWidth()
                     .weight(1f),
-                contentPadding = PaddingValues(horizontal = 16.dp)
+                contentPadding = PaddingValues(horizontal = 16.dp, vertical = 8.dp)
             ) {
                 items(contacts) { contact ->
                     ContactSuggestionItem(
@@ -133,95 +147,65 @@ fun ComposeMessageScreen(
                 }
             }
         } else {
-            // Message composition area
+            // Message composition area scrollable context (templates or hints)
             Column(
                 modifier = Modifier
                     .fillMaxWidth()
                     .weight(1f)
                     .padding(16.dp)
             ) {
-                // Message input
-                OutlinedTextField(
-                    value = uiState.messageText,
-                    onValueChange = { viewModel.updateMessageText(it) },
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .weight(1f),
-                    placeholder = { Text("Type a message...") },
-                    minLines = 3,
-                    enabled = uiState.selectedRecipient != null,
-                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Text)
-                )
-                
-                Spacer(modifier = Modifier.height(8.dp))
-                
-                // Message info and send button
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    // Character count and SMS info
-                    Column {
-                        if (uiState.messageText.isNotBlank()) {
-                            val smsInfo = uiState.smsInfo
-                            Text(
-                                text = "${smsInfo?.messageLength ?: 0} characters",
-                                style = MaterialTheme.typography.bodySmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant
-                            )
-                            
-                            smsInfo?.let { info ->
-                                if (info.willSendAsMultipart) {
-                                    Text(
-                                        text = "${info.partCount} SMS parts",
-                                        style = MaterialTheme.typography.bodySmall,
-                                        color = MaterialTheme.colorScheme.secondary
-                                    )
-                                }
-                            }
-                        }
-                    }
-                    
-                    // Send button
-                    Button(
-                        onClick = { viewModel.sendMessage() },
-                        enabled = uiState.canSendMessage && !uiState.isSending
+                if (uiState.messageText.isBlank()) {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(bottom = 8.dp),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
                     ) {
-                        if (uiState.isSending) {
-                            CircularProgressIndicator(
-                                modifier = Modifier.size(16.dp),
-                                strokeWidth = 2.dp
-                            )
-                        } else {
-                            Row(
-                                verticalAlignment = Alignment.CenterVertically
-                            ) {
-                                Text("Send")
-                                Spacer(modifier = Modifier.width(8.dp))
-                                Icon(Icons.Default.Send, contentDescription = null)
+                        val quicks = listOf("On my way", "Call you later", "Thank you!")
+                        quicks.forEach { q ->
+                            OutlinedButton(onClick = { viewModel.updateMessageText(q) }, contentPadding = PaddingValues(horizontal = 12.dp, vertical = 6.dp)) {
+                                Text(q)
                             }
                         }
                     }
                 }
             }
         }
+
+        // Bottom composer (iOS-style)
+        PremiumComposerBar(
+            text = uiState.messageText,
+            onTextChange = { viewModel.updateMessageText(it) },
+            onSend = {
+                haptics.performHapticFeedback(androidx.compose.ui.hapticfeedback.HapticFeedbackType.TextHandleMove)
+                viewModel.sendMessage()
+            },
+            canSend = uiState.canSendMessage,
+            isSending = uiState.isSending,
+            placeholder = if (uiState.selectedRecipient == null) "Select a recipient to start" else "Type a message"
+        )
+        }
+        // Close Scaffold content lambda
     }
-    
+
     // Handle success/error messages
     uiState.message?.let { message ->
         LaunchedEffect(message) {
             // Show success message and optionally navigate back
             if (message.contains("sent", ignoreCase = true)) {
+                snackbarHostState.showSnackbar(message)
                 onNavigateBack()
+            } else {
+                snackbarHostState.showSnackbar(message)
             }
             viewModel.clearMessage()
         }
     }
-    
+
+
     uiState.error?.let { error ->
         LaunchedEffect(error) {
-            // Show error snackbar
+            snackbarHostState.showSnackbar(error)
             viewModel.clearError()
         }
     }

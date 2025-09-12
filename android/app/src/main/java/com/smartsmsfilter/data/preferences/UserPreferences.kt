@@ -3,6 +3,10 @@ package com.smartsmsfilter.data.preferences
 /**
  * Represents user preferences for message filtering and classification
  */
+interface PreferencesSource {
+    val userPreferences: kotlinx.coroutines.flow.Flow<UserPreferences>
+}
+
 data class UserPreferences(
     val isOnboardingCompleted: Boolean = false,
     val filteringMode: FilteringMode = FilteringMode.MODERATE,
@@ -10,6 +14,7 @@ data class UserPreferences(
     val spamTolerance: SpamTolerance = SpamTolerance.MODERATE,
     val enableSmartNotifications: Boolean = true,
     val enableLearningFromFeedback: Boolean = true,
+    val themeMode: ThemeMode = ThemeMode.SYSTEM,
     val customKeywords: Set<String> = emptySet(),
     val trustedSenders: Set<String> = emptySet()
 )
@@ -45,4 +50,13 @@ enum class SpamTolerance(val displayName: String, val description: String) {
     LOW("Low Tolerance", "Block aggressively - I hate spam and promotional messages"),
     MODERATE("Moderate", "Block obvious spam but allow some promotional content"),
     HIGH("High Tolerance", "Only block clear scams, allow most promotional messages")
+}
+
+/**
+ * App theme mode preference
+ */
+enum class ThemeMode(val displayName: String) {
+    SYSTEM("Use system setting"),
+    LIGHT("Light"),
+    DARK("Dark")
 }

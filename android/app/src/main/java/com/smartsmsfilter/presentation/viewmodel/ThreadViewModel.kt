@@ -79,7 +79,7 @@ class ThreadViewModel @Inject constructor(
                 )
                 
                 result.fold(
-                    onSuccess = { status ->
+onSuccess = { _ ->
                         // Save sent message to database
                         val sentMessage = SmsMessage(
                             sender = "You", // Indicates outgoing message

@@ -1,49 +1,77 @@
 package com.smartsmsfilter.presentation.ui.screens
 
+import androidx.compose.animation.*
 import androidx.compose.animation.core.*
-import androidx.compose.foundation.background
+import androidx.compose.foundation.*
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.outlined.Security
-import androidx.compose.material.icons.outlined.SmartToy
-import androidx.compose.material.icons.outlined.Speed
+import androidx.compose.material.icons.automirrored.filled.ArrowForward
+import androidx.compose.material.icons.filled.*
+import androidx.compose.material.icons.outlined.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Brush
-import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.draw.*
+import androidx.compose.ui.graphics.*
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import kotlinx.coroutines.delay
 import com.smartsmsfilter.ui.theme.*
+import com.smartsmsfilter.ui.utils.*
 
+@OptIn(ExperimentalFoundationApi::class)
 @Composable
 fun WelcomeScreen(
     onGetStarted: () -> Unit,
-    onLearnMore: () -> Unit = {}
+    onLearnMore: () -> Unit = {},
+    onRequestPermissions: () -> Unit = {},
+    onRequestDefaultSms: () -> Unit = {}
 ) {
     var isVisible by remember { mutableStateOf(false) }
     val density = LocalDensity.current
+    val haptic = rememberHapticFeedback()
+    // Removed unused scrollState
+    
+    // Stagger animations for features
+    var showFeature1 by remember { mutableStateOf(false) }
+    var showFeature2 by remember { mutableStateOf(false) }
+    var showFeature3 by remember { mutableStateOf(false) }
     
     // Start animation after composition
     LaunchedEffect(Unit) {
-        delay(150)
+        delay(100)
         isVisible = true
+        delay(400)
+        showFeature1 = true
+        delay(150)
+        showFeature2 = true
+        delay(150)
+        showFeature3 = true
     }
     
-    // Spring animation for content
-    val contentOffset by animateFloatAsState(
-        targetValue = if (isVisible) 0f else 100f,
+    // Sophisticated animations
+    val logoScale by animateFloatAsState(
+        targetValue = if (isVisible) 1f else 0.6f,
         animationSpec = spring(
             dampingRatio = Spring.DampingRatioMediumBouncy,
+            stiffness = Spring.StiffnessLow
+        ),
+        label = "logo_scale"
+    )
+    
+    val contentOffset by animateFloatAsState(
+        targetValue = if (isVisible) 0f else 50f,
+        animationSpec = spring(
+            dampingRatio = Spring.DampingRatioLowBouncy,
             stiffness = Spring.StiffnessMedium
         ),
         label = "welcome_content_offset"
@@ -51,7 +79,7 @@ fun WelcomeScreen(
     
     val contentAlpha by animateFloatAsState(
         targetValue = if (isVisible) 1f else 0f,
-        animationSpec = tween(600, easing = EaseOutCubic),
+        animationSpec = tween(800, easing = FastOutSlowInEasing),
         label = "welcome_content_alpha"
     )
     
@@ -85,25 +113,36 @@ fun WelcomeScreen(
         ) {
             Spacer(modifier = Modifier.height(80.dp))
             
-            // App logo area (placeholder for now)
-            Card(
-                modifier = Modifier.size(80.dp),
-                shape = RoundedCornerShape(20.dp),
-                colors = CardDefaults.cardColors(
-                    containerColor = MaterialTheme.colorScheme.primary
-                )
+            // Premium animated logo
+            Box(
+                modifier = Modifier
+                    .size(100.dp)
+                    .scale(logoScale)
             ) {
+                // Animated gradient background
                 Box(
-                    modifier = Modifier.fillMaxSize(),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Icon(
-                        Icons.Outlined.SmartToy,
-                        contentDescription = null,
-                        modifier = Modifier.size(40.dp),
-                        tint = MaterialTheme.colorScheme.onPrimary
-                    )
-                }
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .clip(RoundedCornerShape(24.dp))
+                        .background(
+                            Brush.linearGradient(
+                                colors = listOf(
+                                    MaterialTheme.colorScheme.primary,
+                                    MaterialTheme.colorScheme.secondary
+                                )
+                            )
+                        )
+                )
+                
+                // Icon with subtle animation
+Icon(
+                    imageVector = Icons.Filled.FilterList,
+                    contentDescription = "Smart SMS Filter logo",
+                    modifier = Modifier
+                        .align(Alignment.Center)
+                        .size(50.dp),
+                    tint = MaterialTheme.colorScheme.onPrimary
+                )
             }
             
             Spacer(modifier = Modifier.height(PremiumSpacing.XLarge))
@@ -140,34 +179,76 @@ fun WelcomeScreen(
             
             Spacer(modifier = Modifier.height(PremiumSpacing.XXLarge))
             
-            // Feature highlights
+            // Feature highlights with stagger animation
             Column(
-                verticalArrangement = Arrangement.spacedBy(PremiumSpacing.Large),
-                modifier = Modifier.graphicsLayer {
-                    alpha = contentAlpha
-                }
+                verticalArrangement = Arrangement.spacedBy(PremiumSpacing.Large)
             ) {
-                FeatureHighlight(
-                    icon = Icons.Outlined.SmartToy,
-                    title = "Silences spam automatically",
-                    description = "Advanced filtering keeps promotional messages quiet while prioritizing what matters."
-                )
+                FadeSlideAnimation(
+                    visible = showFeature1
+                ) {
+                    FeatureHighlight(
+                        icon = Icons.Filled.AutoAwesome,
+                        title = "Silences spam automatically",
+                        description = "Advanced filtering keeps promotional messages quiet while prioritizing what matters.",
+                        color = MaterialTheme.colorScheme.primary
+                    )
+                }
                 
-                FeatureHighlight(
-                    icon = Icons.Outlined.Speed,
-                    title = "Prioritizes OTPs, banking & real people", 
-                    description = "Important messages from banks, services, and contacts always reach your inbox."
-                )
+                FadeSlideAnimation(
+                    visible = showFeature2
+                ) {
+                    FeatureHighlight(
+                        icon = Icons.Filled.Speed,
+                        title = "Prioritizes OTPs, banking & real people", 
+                        description = "Important messages from banks, services, and contacts always reach your inbox.",
+                        color = MaterialTheme.colorScheme.secondary
+                    )
+                }
                 
-                FeatureHighlight(
-                    icon = Icons.Outlined.Security,
-                    title = "100% private by design",
-                    description = "All processing happens on your device. Your messages never leave your phone."
-                )
+                FadeSlideAnimation(
+                    visible = showFeature3
+                ) {
+                    FeatureHighlight(
+                        icon = Icons.Filled.Lock,
+                        title = "100% private by design",
+                        description = "All processing happens on your device. Your messages never leave your phone.",
+                        color = MaterialTheme.colorScheme.tertiary
+                    )
+                }
             }
             
             Spacer(modifier = Modifier.height(PremiumSpacing.XXLarge))
             
+            // Why we need permissions section
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(vertical = PremiumSpacing.Large),
+                verticalArrangement = Arrangement.spacedBy(PremiumSpacing.Small)
+            ) {
+                // Privacy pledge
+                Text(
+                    text = "Privacy first: all processing happens on your device. No data leaves your phone.",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+                
+                Text(
+                    text = "Why we need permissions",
+                    style = MaterialTheme.typography.titleLarge,
+                    color = MaterialTheme.colorScheme.onBackground
+                )
+                Text(
+                    text = "• SMS: to read and organize your messages on-device\n• Contacts: to show names instead of numbers\n• Notifications: to alert you only when it matters",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+                Row(horizontalArrangement = Arrangement.spacedBy(PremiumSpacing.Small)) {
+                    Button(onClick = onRequestPermissions) { Text("Grant permissions") }
+                    OutlinedButton(onClick = onRequestDefaultSms) { Text("Set as default SMS app") }
+                }
+            }
+
             // Extra bottom padding to ensure content is visible above action buttons
             Spacer(modifier = Modifier.height(120.dp)) // Height of bottom action area + safe margin
         }
@@ -188,28 +269,71 @@ fun WelcomeScreen(
                     },
                 verticalArrangement = Arrangement.spacedBy(PremiumSpacing.Small)
             ) {
-                // Primary CTA
+                // Primary CTA with haptic feedback
+                val primaryInteractionSource = remember { MutableInteractionSource() }
+                val isPrimaryPressed by primaryInteractionSource.collectIsPressedAsState()
+                
+                // Soft gating: minimal checklist hint (button still enabled)
+                val mainActivity = LocalContext.current as? com.smartsmsfilter.MainActivity
+                val hasAllPermissions by (mainActivity?.hasAllCorePermissions ?: kotlinx.coroutines.flow.MutableStateFlow(false)).collectAsState()
+                val isDefaultSms by (mainActivity?.isDefaultSmsApp ?: kotlinx.coroutines.flow.MutableStateFlow(false)).collectAsState()
+
                 Button(
-                    onClick = onGetStarted,
+                    onClick = {
+                        haptic(HapticManager.FeedbackType.IMPACT_MEDIUM)
+                        onGetStarted()
+                    },
                     modifier = Modifier
                         .fillMaxWidth()
-                        .height(56.dp),
-                    shape = RoundedCornerShape(PremiumCornerRadius.Large),
+                        .height(56.dp)
+                        .bouncyPress(isPrimaryPressed),
+                    shape = RoundedCornerShape(16.dp),
                     colors = ButtonDefaults.buttonColors(
                         containerColor = MaterialTheme.colorScheme.primary
-                    )
+                    ),
+                    interactionSource = primaryInteractionSource
                 ) {
-                    Text(
-                        text = "Get Started",
-                        style = MaterialTheme.typography.titleMedium.copy(
-                            fontWeight = FontWeight.SemiBold
+                    Row(
+                        horizontalArrangement = Arrangement.Center,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text(
+                            text = "Get Started",
+                            style = MaterialTheme.typography.titleMedium.copy(
+                                fontWeight = FontWeight.SemiBold
+                            )
                         )
-                    )
+                        Spacer(modifier = Modifier.width(8.dp))
+Icon(
+                            imageVector = Icons.AutoMirrored.Filled.ArrowForward,
+                            contentDescription = null,
+                            modifier = Modifier.size(20.dp)
+                        )
+                    }
+                }
+
+                // Minimal checklist hint
+                if (!hasAllPermissions || !isDefaultSms) {
+                    val hintColor = MaterialTheme.colorScheme.onSurfaceVariant
+                    Column(
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalArrangement = Arrangement.spacedBy(4.dp)
+                    ) {
+                        if (!hasAllPermissions) {
+                            Text("• Grant SMS, Contacts, Notifications", color = hintColor, style = MaterialTheme.typography.bodySmall)
+                        }
+                        if (!isDefaultSms) {
+                            Text("• Set Smart SMS Filter as default SMS app", color = hintColor, style = MaterialTheme.typography.bodySmall)
+                        }
+                    }
                 }
                 
-                // Secondary CTA
+                // Secondary CTA with subtle haptic
                 TextButton(
-                    onClick = onLearnMore,
+                    onClick = {
+                        haptic(HapticManager.FeedbackType.SELECTION)
+                        onLearnMore()
+                    },
                     modifier = Modifier.fillMaxWidth()
                 ) {
                     Text(
@@ -228,45 +352,75 @@ private fun FeatureHighlight(
     icon: ImageVector,
     title: String,
     description: String,
+    color: Color,
     modifier: Modifier = Modifier
 ) {
+    val infiniteTransition = rememberInfiniteTransition(label = "feature_pulse")
+    val pulseAlpha by infiniteTransition.animateFloat(
+        initialValue = 0.1f,
+        targetValue = 0.2f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(2000, easing = FastOutSlowInEasing),
+            repeatMode = RepeatMode.Reverse
+        ),
+        label = "pulse_alpha"
+    )
+    
     Row(
-        modifier = modifier.fillMaxWidth(),
+        modifier = modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(16.dp))
+            .background(
+                color = color.copy(alpha = pulseAlpha)
+            )
+            .padding(PremiumSpacing.Medium),
         horizontalArrangement = Arrangement.spacedBy(PremiumSpacing.Medium),
         verticalAlignment = Alignment.Top
     ) {
-        // Icon container
+        // Premium icon container with gradient
         Box(
             modifier = Modifier
-                .size(48.dp)
-                .clip(RoundedCornerShape(12.dp))
-                .background(MaterialTheme.colorScheme.primaryContainer),
+                .size(52.dp)
+                .clip(RoundedCornerShape(14.dp))
+                .background(
+                    Brush.linearGradient(
+                        colors = listOf(
+                            color.copy(alpha = 0.2f),
+                            color.copy(alpha = 0.3f)
+                        )
+                    )
+                ),
             contentAlignment = Alignment.Center
         ) {
             Icon(
                 imageVector = icon,
                 contentDescription = null,
-                modifier = Modifier.size(24.dp),
-                tint = MaterialTheme.colorScheme.onPrimaryContainer
+                modifier = Modifier.size(28.dp),
+                tint = color
             )
         }
         
-        // Text content
+        // Text content with better typography
         Column(
             modifier = Modifier.weight(1f),
-            verticalArrangement = Arrangement.spacedBy(4.dp)
+            verticalArrangement = Arrangement.spacedBy(6.dp)
         ) {
             Text(
                 text = title,
                 style = MaterialTheme.typography.titleMedium.copy(
-                    fontWeight = FontWeight.SemiBold
+                    fontWeight = FontWeight.Bold,
+                    fontSize = 16.sp,
+                    letterSpacing = 0.5.sp
                 ),
                 color = MaterialTheme.colorScheme.onBackground
             )
             Text(
                 text = description,
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
+                style = MaterialTheme.typography.bodyMedium.copy(
+                    lineHeight = 20.sp,
+                    letterSpacing = 0.25.sp
+                ),
+                color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.9f)
             )
         }
     }

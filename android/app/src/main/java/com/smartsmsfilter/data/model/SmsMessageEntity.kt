@@ -5,7 +5,16 @@ import androidx.room.PrimaryKey
 import com.smartsmsfilter.domain.model.MessageCategory
 import java.util.Date
 
-@Entity(tableName = "sms_messages")
+@Entity(
+    tableName = "sms_messages",
+    indices = [
+        androidx.room.Index(value = ["category"]),
+        androidx.room.Index(value = ["sender"]),
+        androidx.room.Index(value = ["timestamp"]),
+        androidx.room.Index(value = ["isArchived", "isDeleted"]),
+        androidx.room.Index(value = ["isImportant"])
+    ]
+)
 data class SmsMessageEntity(
     @PrimaryKey(autoGenerate = true)
     val id: Long = 0,
@@ -15,7 +24,13 @@ data class SmsMessageEntity(
     val category: String,
     val isRead: Boolean = false,
     val threadId: String? = null,
-    val createdAt: Long = System.currentTimeMillis()
+    val createdAt: Long = System.currentTimeMillis(),
+    val isArchived: Boolean = false,
+    val isDeleted: Boolean = false,
+    val deletedAt: Long? = null,
+    val manualCategoryOverride: String? = null, // User manually changed category
+    val isImportant: Boolean = false, // User marked as important
+    val lastModified: Long = System.currentTimeMillis()
 )
 
 // Extension functions for mapping between domain and data models
@@ -26,7 +41,11 @@ fun SmsMessageEntity.toDomain() = com.smartsmsfilter.domain.model.SmsMessage(
     timestamp = Date(timestamp),
     category = MessageCategory.valueOf(category),
     isRead = isRead,
-    threadId = threadId
+    threadId = threadId,
+    isArchived = isArchived,
+    isDeleted = isDeleted,
+    manualCategoryOverride = manualCategoryOverride?.let { MessageCategory.valueOf(it) },
+    isImportant = isImportant
 )
 
 fun com.smartsmsfilter.domain.model.SmsMessage.toEntity() = SmsMessageEntity(
@@ -36,5 +55,9 @@ fun com.smartsmsfilter.domain.model.SmsMessage.toEntity() = SmsMessageEntity(
     timestamp = timestamp.time,
     category = category.name,
     isRead = isRead,
-    threadId = threadId
+    threadId = threadId,
+    isArchived = isArchived,
+    isDeleted = isDeleted,
+    manualCategoryOverride = manualCategoryOverride?.name,
+    isImportant = isImportant
 )

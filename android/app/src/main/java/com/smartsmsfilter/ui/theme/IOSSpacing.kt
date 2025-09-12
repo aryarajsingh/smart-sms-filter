@@ -76,3 +76,21 @@ object PremiumElevation {
     val Level4 = 8.dp  // For floating elements
     val Level5 = 16.dp // For the highest elevation elements
 }
+
+// IOSSpacing object with both capitalized and lowercase properties
+object IOSSpacing {
+    // Capitalized versions (matching PremiumSpacing)
+    val Small = PremiumSpacing.Small
+    val Medium = PremiumSpacing.Medium
+    val Large = PremiumSpacing.Large
+    val XSmall = PremiumSpacing.XSmall
+    val XLarge = PremiumSpacing.XLarge
+    
+    // Lowercase versions for component compatibility
+    @get:JvmName("getSmallLowercase")
+    val small = PremiumSpacing.Small
+    @get:JvmName("getMediumLowercase")
+    val medium = PremiumSpacing.Medium
+    @get:JvmName("getLargeLowercase")
+    val large = PremiumSpacing.Large
+}

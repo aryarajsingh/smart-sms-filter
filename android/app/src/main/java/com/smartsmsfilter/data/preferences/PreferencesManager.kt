@@ -18,7 +18,7 @@ private val Context.dataStore: DataStore<Preferences> by preferencesDataStore(na
 @Singleton
 class PreferencesManager @Inject constructor(
     private val context: Context
-) {
+) : PreferencesSource {
     
     companion object {
         private val ONBOARDING_COMPLETED = booleanPreferencesKey("onboarding_completed")
@@ -29,12 +29,13 @@ class PreferencesManager @Inject constructor(
         private val ENABLE_LEARNING_FROM_FEEDBACK = booleanPreferencesKey("enable_learning_from_feedback")
         private val CUSTOM_KEYWORDS = stringSetPreferencesKey("custom_keywords")
         private val TRUSTED_SENDERS = stringSetPreferencesKey("trusted_senders")
+        private val THEME_MODE = stringPreferencesKey("theme_mode")
     }
     
     /**
      * Get user preferences as a Flow
      */
-    val userPreferences: Flow<UserPreferences> = context.dataStore.data.map { preferences ->
+    override val userPreferences: Flow<UserPreferences> = context.dataStore.data.map { preferences ->
         UserPreferences(
             isOnboardingCompleted = preferences[ONBOARDING_COMPLETED] ?: false,
             filteringMode = FilteringMode.valueOf(
@@ -54,7 +55,10 @@ class PreferencesManager @Inject constructor(
             enableSmartNotifications = preferences[ENABLE_SMART_NOTIFICATIONS] ?: true,
             enableLearningFromFeedback = preferences[ENABLE_LEARNING_FROM_FEEDBACK] ?: true,
             customKeywords = preferences[CUSTOM_KEYWORDS] ?: emptySet(),
-            trustedSenders = preferences[TRUSTED_SENDERS] ?: emptySet()
+            trustedSenders = preferences[TRUSTED_SENDERS] ?: emptySet(),
+            themeMode = try {
+                ThemeMode.valueOf(preferences[THEME_MODE] ?: ThemeMode.SYSTEM.name)
+            } catch (e: IllegalArgumentException) { ThemeMode.SYSTEM }
         )
     }
     
@@ -111,6 +115,15 @@ class PreferencesManager @Inject constructor(
             preferences[ENABLE_LEARNING_FROM_FEEDBACK] = enabled
         }
     }
+
+    /**
+     * Update theme mode
+     */
+    suspend fun setThemeMode(mode: ThemeMode) {
+        context.dataStore.edit { preferences ->
+            preferences[THEME_MODE] = mode.name
+        }
+    }
     
     /**
      * Save complete user preferences
@@ -125,6 +138,7 @@ class PreferencesManager @Inject constructor(
             dataStorePreferences[ENABLE_LEARNING_FROM_FEEDBACK] = preferences.enableLearningFromFeedback
             dataStorePreferences[CUSTOM_KEYWORDS] = preferences.customKeywords
             dataStorePreferences[TRUSTED_SENDERS] = preferences.trustedSenders
+            dataStorePreferences[THEME_MODE] = preferences.themeMode.name
         }
     }
 }

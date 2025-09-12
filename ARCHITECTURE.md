@@ -40,9 +40,10 @@ SMS Received -> SMS Receiver -> Classification Service -> Database -> UI Update
 
 ### Classification System
 - **Rule-Based Classifier**: Pattern matching, keywords, sender analysis
-- **AI Classifier**: TensorFlow Lite neural network inference
+- **AI Classifier**: TensorFlow Lite neural network inference (planned)
 - **Hybrid Approach**: Combines both with confidence scoring
 - **Learning System**: Improves from user corrections
+- **Explainability**: Classification Audit table stores reasons; UI exposes a “Why?” bottom sheet
 
 ### Database Schema
 ```sql
@@ -55,6 +56,15 @@ sms_messages:
 - isRead (BOOLEAN)
 - threadId (TEXT, NULLABLE)
 - createdAt (INTEGER)
+
+classification_audit:
+- id (PRIMARY KEY)
+- messageId (INTEGER, NULLABLE)
+- classifier (TEXT)
+- category (TEXT)
+- confidence (REAL)
+- reasonsJson (TEXT, pipe-delimited)
+- timestamp (INTEGER)
 ```
 
 ## Technology Stack
@@ -62,7 +72,8 @@ sms_messages:
 - **UI Framework**: Jetpack Compose + Material3
 - **Architecture Components**: ViewModel, Room, Navigation
 - **Dependency Injection**: Hilt
-- **AI/ML**: TensorFlow Lite
+- **Notifications**: Multiple channels; OTPs are never silent
+- **AI/ML**: TensorFlow Lite (planned integration)
 - **Async**: Kotlin Coroutines + Flow
 - **Build System**: Gradle with Version Catalogs
 

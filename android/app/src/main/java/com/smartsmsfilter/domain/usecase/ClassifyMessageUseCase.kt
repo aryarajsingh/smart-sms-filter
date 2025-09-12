@@ -22,12 +22,7 @@ class ClassifyMessageUseCase @Inject constructor(
             // Classify the message
             val classification = classificationService.classifyAndStore(message)
             
-            // Create message with classification
-            val classifiedMessage = message.copy(category = classification.category)
-            
-            // Save to database
-            smsRepository.insertMessage(classifiedMessage)
-            
+            // Message already stored by ClassificationService
             Result.success(classification)
         } catch (e: Exception) {
             Result.failure(e)

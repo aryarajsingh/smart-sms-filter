@@ -9,13 +9,17 @@ data class SmsMessage(
     val timestamp: Date,
     val category: MessageCategory = MessageCategory.NEEDS_REVIEW,
     val isRead: Boolean = false,
-    val threadId: String? = null
+    val threadId: String? = null,
+    val isArchived: Boolean = false,
+    val isDeleted: Boolean = false,
+    val manualCategoryOverride: MessageCategory? = null,
+    val isImportant: Boolean = false
 )
 
 enum class MessageCategory {
-    INBOX,      // Important messages (OTP, bank, personal)
-    FILTERED,   // Spam/promotional messages  
-    NEEDS_REVIEW // Uncertain classification
+    INBOX,          // Important messages (OTP, bank, personal)
+    SPAM,           // Promotional/unwanted messages  
+    NEEDS_REVIEW    // Uncertain classification requiring user review
 }
 
 data class MessageClassification(

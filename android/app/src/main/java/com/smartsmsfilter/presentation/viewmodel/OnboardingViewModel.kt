@@ -18,11 +18,11 @@ class OnboardingViewModel @Inject constructor(
     val uiState: StateFlow<OnboardingUiState> = _uiState.asStateFlow()
     
     // Current user preferences
-    val userPreferences: StateFlow<UserPreferences?> = preferencesManager.userPreferences
+    val userPreferences: StateFlow<UserPreferences> = preferencesManager.userPreferences
         .stateIn(
             scope = viewModelScope,
             started = SharingStarted.WhileSubscribed(5000),
-            initialValue = null
+            initialValue = UserPreferences() // Default preferences
         )
     
     fun saveUserPreferences(preferences: UserPreferences) {

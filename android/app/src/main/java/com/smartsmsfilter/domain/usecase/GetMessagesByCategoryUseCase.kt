@@ -3,6 +3,8 @@ package com.smartsmsfilter.domain.usecase
 import com.smartsmsfilter.domain.model.MessageCategory
 import com.smartsmsfilter.domain.model.SmsMessage
 import com.smartsmsfilter.domain.repository.SmsRepository
+import com.smartsmsfilter.domain.common.Result
+import com.smartsmsfilter.domain.common.suspendResultOf
 import kotlinx.coroutines.flow.Flow
 import javax.inject.Inject
 import javax.inject.Singleton
@@ -32,8 +34,8 @@ class UpdateMessageCategoryUseCase @Inject constructor(
     private val repository: SmsRepository
 ) {
     
-    suspend operator fun invoke(messageId: Long, category: MessageCategory) {
-        repository.updateMessageCategory(messageId, category)
+    suspend operator fun invoke(messageId: Long, category: MessageCategory): Result<Unit> {
+        return repository.updateMessageCategory(messageId, category)
     }
 }
 
@@ -42,7 +44,7 @@ class MarkMessageAsReadUseCase @Inject constructor(
     private val repository: SmsRepository
 ) {
     
-    suspend operator fun invoke(messageId: Long) {
-        repository.markAsRead(messageId)
+    suspend operator fun invoke(messageId: Long): Result<Unit> {
+        return repository.markAsRead(messageId)
     }
 }

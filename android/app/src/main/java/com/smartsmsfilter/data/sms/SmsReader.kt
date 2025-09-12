@@ -92,6 +92,12 @@ class SmsReader @Inject constructor(
     ): List<SmsMessage> {
         val messages = mutableListOf<SmsMessage>()
         
+        // Check for permission before accessing SMS
+        if (context.checkSelfPermission(android.Manifest.permission.READ_SMS) != android.content.pm.PackageManager.PERMISSION_GRANTED) {
+            Log.w(TAG, "READ_SMS permission not granted")
+            return messages
+        }
+        
         try {
             val cursor = context.contentResolver.query(
                 uri,
@@ -109,20 +115,20 @@ class SmsReader @Inject constructor(
             )
             
             cursor?.use { c ->
-                val idIndex = c.getColumnIndex(Telephony.Sms._ID)
-                val addressIndex = c.getColumnIndex(Telephony.Sms.ADDRESS)
-                val bodyIndex = c.getColumnIndex(Telephony.Sms.BODY)
-                val dateIndex = c.getColumnIndex(Telephony.Sms.DATE)
-                val readIndex = c.getColumnIndex(Telephony.Sms.READ)
-                val threadIndex = c.getColumnIndex(Telephony.Sms.THREAD_ID)
+                val idIndex = c.getColumnIndexOrThrow(Telephony.Sms._ID)
+                val addressIndex = c.getColumnIndexOrThrow(Telephony.Sms.ADDRESS)
+                val bodyIndex = c.getColumnIndexOrThrow(Telephony.Sms.BODY)
+                val dateIndex = c.getColumnIndexOrThrow(Telephony.Sms.DATE)
+                val readIndex = c.getColumnIndexOrThrow(Telephony.Sms.READ)
+                val threadIndex = c.getColumnIndexOrThrow(Telephony.Sms.THREAD_ID)
                 
                 while (c.moveToNext()) {
-                    val id = c.getLong(idIndex)
-                    val address = c.getString(addressIndex) ?: "Unknown"
-                    val body = c.getString(bodyIndex) ?: ""
-                    val date = c.getLong(dateIndex)
-                    val isRead = c.getInt(readIndex) == 1
-                    val threadId = c.getString(threadIndex)
+                    val id = if (idIndex >= 0 && !c.isNull(idIndex)) c.getLong(idIndex) else 0L
+                    val address = if (addressIndex >= 0 && !c.isNull(addressIndex)) c.getString(addressIndex) else "Unknown"
+                    val body = if (bodyIndex >= 0 && !c.isNull(bodyIndex)) c.getString(bodyIndex) else ""
+                    val date = if (dateIndex >= 0 && !c.isNull(dateIndex)) c.getLong(dateIndex) else System.currentTimeMillis()
+                    val isRead = if (readIndex >= 0 && !c.isNull(readIndex)) c.getInt(readIndex) == 1 else false
+                    val threadId = if (threadIndex >= 0 && !c.isNull(threadIndex)) c.getString(threadIndex) else null
                     
                     val sender = if (isOutgoing) "You" else address
                     

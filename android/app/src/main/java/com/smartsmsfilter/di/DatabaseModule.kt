@@ -41,8 +41,8 @@ object DatabaseModule {
     
     @Provides
     @Singleton
-    fun provideSmsRepository(dao: SmsMessageDao): SmsRepository {
-        return SmsRepositoryImpl(dao)
+    fun provideSmsRepository(dao: SmsMessageDao, database: SmsDatabase): SmsRepository {
+        return SmsRepositoryImpl(dao, database)
     }
     
     @Provides

@@ -8,9 +8,16 @@ import android.telephony.SmsMessage
 import android.util.Log
 import com.smartsmsfilter.domain.model.SmsMessage as DomainSmsMessage
 import com.smartsmsfilter.domain.repository.SmsRepository
+import com.smartsmsfilter.domain.common.CoroutineScopeManager
+import com.smartsmsfilter.domain.common.AppException
+import com.smartsmsfilter.domain.validation.validatePhoneNumber
+import com.smartsmsfilter.domain.validation.validateMessage
+import com.smartsmsfilter.domain.classifier.ClassificationService
+import com.smartsmsfilter.services.SmartNotificationManager
 import dagger.hilt.android.AndroidEntryPoint
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.launch
 import java.util.Date
 import javax.inject.Inject
@@ -21,51 +28,101 @@ class SmsReceiver : BroadcastReceiver() {
     @Inject
     lateinit var smsRepository: SmsRepository
     
-    private val scope = CoroutineScope(Dispatchers.IO)
+    @Inject 
+    lateinit var scopeManager: CoroutineScopeManager
+    
+    @Inject
+    lateinit var classificationService: ClassificationService
+    
+    @Inject
+    lateinit var notificationManager: SmartNotificationManager
+    
+    // Note: Don't create a global scope - use scopeManager instead
     
     companion object {
         private const val TAG = "SmsReceiver"
     }
     
     override fun onReceive(context: Context?, intent: Intent?) {
-        Log.d(TAG, "SMS received!")
+        Log.d(TAG, "=== SMS RECEIVER TRIGGERED ===")
+        Log.d(TAG, "Action: ${intent?.action}")
+        Log.d(TAG, "Intent extras: ${intent?.extras?.keySet()}")
         
-        if (intent?.action == Telephony.Sms.Intents.SMS_RECEIVED_ACTION) {
-            val messages = Telephony.Sms.Intents.getMessagesFromIntent(intent)
-            
-            messages?.forEach { smsMessage ->
-                processSmsMessage(smsMessage)
+        if (context == null || intent == null) {
+            Log.w(TAG, "Received null context or intent")
+            return
+        }
+        
+        if (intent.action == Telephony.Sms.Intents.SMS_RECEIVED_ACTION || 
+            intent.action == "android.provider.Telephony.SMS_DELIVER") {
+            try {
+                val messages = Telephony.Sms.Intents.getMessagesFromIntent(intent)
+                
+                if (messages.isNullOrEmpty()) {
+                    Log.w(TAG, "No SMS messages found in intent")
+                    return
+                }
+                
+                // Process each message with proper error handling
+                messages.forEach { smsMessage ->
+                    processSmsMessageSafely(smsMessage)
+                }
+                
+            } catch (e: Exception) {
+                Log.e(TAG, "Error processing SMS intent", e)
             }
+        } else {
+            Log.w(TAG, "Received unhandled SMS action: ${intent.action}")
         }
     }
     
-    private fun processSmsMessage(smsMessage: SmsMessage) {
-        val sender = smsMessage.originatingAddress ?: "Unknown"
-        val content = smsMessage.messageBody ?: ""
-        val timestamp = Date(smsMessage.timestampMillis)
-        
-        Log.d(TAG, "Processing SMS from $sender: $content")
-        
-        // Create domain message
-        val domainMessage = DomainSmsMessage(
-            sender = sender,
-            content = content,
-            timestamp = timestamp,
-            category = com.smartsmsfilter.domain.model.MessageCategory.NEEDS_REVIEW, // Will be classified later
-            isRead = false
-        )
-        
-        // Save to database
-        scope.launch {
+    private fun processSmsMessageSafely(smsMessage: SmsMessage) {
+        // Use a controlled scope that will be cancelled properly
+        scopeManager.launchSafely {
             try {
-                val messageId = smsRepository.insertMessage(domainMessage)
-                Log.d(TAG, "SMS saved with ID: $messageId")
+                val sender = smsMessage.originatingAddress ?: "Unknown"
+                val content = smsMessage.messageBody ?: ""
+                val timestamp = Date(smsMessage.timestampMillis)
                 
-                // TODO: Start classification service
-                // ClassificationService.classifyMessage(messageId)
+                Log.d(TAG, "Processing SMS from $sender")
+                
+                // Validate input data
+                val senderValidation = sender.validatePhoneNumber()
+                val contentValidation = content.validateMessage()
+                
+                if (senderValidation.isError) {
+                    Log.w(TAG, "Invalid sender phone number: $sender")
+                    // Still process with original sender for logging
+                }
+                
+                if (contentValidation.isError) {
+                    Log.w(TAG, "Invalid message content")
+                    return@launchSafely // Skip empty messages
+                }
+                
+                // Prepare domain message (category will be finalized by service)
+                val finalSender = senderValidation.getOrNull() ?: sender
+                val finalContent = contentValidation.getOrNull() ?: content
+                val provisionalMessage = DomainSmsMessage(
+                    sender = finalSender,
+                    content = finalContent,
+                    timestamp = timestamp,
+                    category = com.smartsmsfilter.domain.model.MessageCategory.NEEDS_REVIEW,
+                    isRead = false
+                )
+
+                // Classify and store via service (handles DB write)
+                val classification = classificationService.classifyAndStore(provisionalMessage)
+                Log.d(TAG, "Message classified as: ${classification.category} (conf=${classification.confidence})")
+
+                // Notify user based on final category
+                notificationManager.showSmartNotification(
+                    provisionalMessage.copy(category = classification.category)
+                )
+                Log.d(TAG, "Notification sent for category: ${classification.category}")
                 
             } catch (e: Exception) {
-                Log.e(TAG, "Failed to save SMS", e)
+                Log.e(TAG, "Unexpected error processing SMS", e)
             }
         }
     }

@@ -98,4 +98,17 @@ object IOSTypography {
         lineHeight = 13.sp,
         letterSpacing = 0.07.sp
     )
+    
+    // Material Design-style aliases for component compatibility
+    val headlineSmall = Title3
+    val headlineMedium = Title2
+    val headlineLarge = Title1
+    val titleMedium = Headline
+    val bodyLarge = Body
+    val bodyMedium = Callout
+    val bodySmall = Subhead
+    val labelSmall = Caption2
+    val labelMedium = Caption1
+    val labelLarge = Footnote
+    val caption = Caption1
 }

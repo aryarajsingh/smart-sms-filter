@@ -1,14 +1,22 @@
 package com.smartsmsfilter.data.contacts
 
 import android.content.Context
+import android.content.pm.PackageManager
 import android.database.Cursor
 import android.net.Uri
 import android.provider.ContactsContract
 import android.util.Log
+import androidx.core.content.ContextCompat
+import com.smartsmsfilter.domain.common.Result
+import com.smartsmsfilter.domain.common.AppException
+import com.smartsmsfilter.domain.common.asSuccess
+import com.smartsmsfilter.domain.validation.validateContactName
+import com.smartsmsfilter.domain.validation.validatePhoneNumber
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.flowOn
+import kotlinx.coroutines.flow.catch
 import javax.inject.Inject
 import javax.inject.Singleton
 
@@ -23,11 +31,19 @@ class ContactManager @Inject constructor(
     
     /**
      * Gets all contacts with phone numbers
+     * Returns Flow<Result<List<Contact>>> for proper error handling
      */
-    fun getAllContacts(): Flow<List<Contact>> = flow {
+    fun getAllContacts(): Flow<Result<List<Contact>>> = flow {
+        emit(Result.Loading)
+        
         val contacts = mutableListOf<Contact>()
         
         try {
+            // Check if we have permission first
+            if (!hasContactPermission()) {
+                throw AppException.ContactPermissionDenied()
+            }
+            
             val cursor = context.contentResolver.query(
                 ContactsContract.CommonDataKinds.Phone.CONTENT_URI,
                 arrayOf(
@@ -56,12 +72,16 @@ class ContactManager @Inject constructor(
                     val type = c.getInt(typeIndex)
                     val photoUri = c.getString(photoIndex)
                     
-                    if (number.isNotBlank()) {
+                    // Validate data before creating contact
+                    val phoneValidation = number.validatePhoneNumber()
+                    val nameValidation = name.validateContactName()
+                    
+                    if (phoneValidation.isSuccess && nameValidation.isSuccess) {
                         contacts.add(
                             Contact(
                                 id = contactId,
-                                name = name,
-                                phoneNumber = formatPhoneNumber(number),
+                                name = nameValidation.getOrNull() ?: "Unknown",
+                                phoneNumber = phoneValidation.getOrNull() ?: number,
                                 phoneType = getPhoneTypeLabel(type),
                                 photoUri = photoUri,
                                 isFrequentContact = false // Will be determined by usage
@@ -72,11 +92,20 @@ class ContactManager @Inject constructor(
             }
             
             Log.d(TAG, "Loaded ${contacts.size} contacts")
+            emit(contacts.distinctBy { it.phoneNumber }.asSuccess())
+            
+        } catch (e: AppException) {
+            Log.e(TAG, "Contact permission or validation error", e)
+            emit(Result.Error(e))
+        } catch (e: SecurityException) {
+            Log.e(TAG, "Security exception loading contacts", e)
+            emit(Result.Error(AppException.ContactPermissionDenied(e)))
         } catch (e: Exception) {
             Log.e(TAG, "Failed to load contacts", e)
+            emit(Result.Error(AppException.ContactLoadFailed(e)))
         }
-        
-        emit(contacts.distinctBy { it.phoneNumber }) // Remove duplicates
+    }.catch { throwable ->
+        emit(Result.Error(AppException.from(throwable)))
     }.flowOn(Dispatchers.IO)
     
     /**
@@ -212,6 +241,16 @@ class ContactManager @Inject constructor(
             ContactsContract.CommonDataKinds.Phone.TYPE_OTHER -> "Other"
             else -> "Mobile"
         }
+    }
+    
+    /**
+     * Checks if we have contact permission
+     */
+    private fun hasContactPermission(): Boolean {
+        return ContextCompat.checkSelfPermission(
+            context,
+            android.Manifest.permission.READ_CONTACTS
+        ) == PackageManager.PERMISSION_GRANTED
     }
 }
 

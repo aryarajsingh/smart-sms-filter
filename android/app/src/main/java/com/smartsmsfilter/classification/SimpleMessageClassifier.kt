@@ -11,9 +11,15 @@ import javax.inject.Inject
 import javax.inject.Singleton
 
 @Singleton
+/**
+ * Fast, rule-based classifier leveraging onboarding preferences.
+ * Keeps logic simple, with OTP and important-type short-circuits.
+ */
 class SimpleMessageClassifier @Inject constructor(
-    private val preferencesManager: PreferencesManager
+    preferencesSource: com.smartsmsfilter.data.preferences.PreferencesSource
 ) {
+
+    private val preferencesFlow = preferencesSource.userPreferences
 
     companion object {
         // Banking and financial keywords - usually important
@@ -78,7 +84,7 @@ class SimpleMessageClassifier @Inject constructor(
      */
     fun classifyMessage(sender: String, content: String): MessageCategory {
         return runBlocking {
-            val preferences = preferencesManager.userPreferences.first()
+            val preferences = preferencesFlow.first()
             classifyWithPreferences(sender, content, preferences)
         }
     }
@@ -96,17 +102,14 @@ class SimpleMessageClassifier @Inject constructor(
             return MessageCategory.INBOX
         }
         
-        // Always block obvious spam senders (regardless of tolerance)
-        if (SPAM_SENDERS.any { senderUpper.startsWith(it) }) {
-            return MessageCategory.FILTERED
-        }
+        // Do NOT blanket block DLT route prefixes like VM-/RM-/VK-; treat neutral and rely on content/reputation
+        // (If future sender reputation exists, consult that here.)
         
         // Check user's selected important message types
         val userImportantTypes = preferences.importantMessageTypes
         
-        // OTPs - check if user considers them important
-        if (userImportantTypes.contains(ImportantMessageType.OTPS) && 
-            containsAnyKeyword(contentLower, OTP_KEYWORDS)) {
+        // OTPs - ALWAYS important regardless of preference (align with contextual classifier)
+        if (isOtp(content)) {
             return MessageCategory.INBOX
         }
         
@@ -141,11 +144,11 @@ class SimpleMessageClassifier @Inject constructor(
         }
         
         // Apply spam filtering based on user's spam tolerance and filtering mode
-        val spamScore = calculateSpamScore(contentLower, senderUpper)
+        val spamScore = calculateSpamScore(contentLower, senderUpper, content)
         val threshold = getSpamThreshold(preferences.spamTolerance, preferences.filteringMode)
         
         if (spamScore >= threshold) {
-            return MessageCategory.FILTERED
+            return MessageCategory.SPAM
         }
         
         // If we reach here, the message is uncertain
@@ -158,6 +161,10 @@ class SimpleMessageClassifier @Inject constructor(
         }
     }
 
+    private fun isOtp(content: String): Boolean {
+        return ClassificationConstants.OTP_REGEXES.any { Regex(it, RegexOption.IGNORE_CASE).containsMatchIn(content) }
+    }
+
     private fun isPhoneNumber(sender: String): Boolean {
         // Simple check for phone number format
         return sender.replace(Regex("[+\\-\\s()]"), "").all { it.isDigit() } && 
@@ -168,7 +175,7 @@ class SimpleMessageClassifier @Inject constructor(
      * Calculate a spam score for the message (0-100)
      * Higher score = more likely to be spam
      */
-    private fun calculateSpamScore(contentLower: String, senderUpper: String): Int {
+    private fun calculateSpamScore(contentLower: String, senderUpper: String, originalContent: String): Int {
         var score = 0
         
         // Check spam keywords (each adds points)
@@ -179,20 +186,26 @@ class SimpleMessageClassifier @Inject constructor(
         val promoKeywordCount = PROMOTIONAL_KEYWORDS.count { contentLower.contains(it) }
         score += promoKeywordCount * 15 // Each promo keyword = 15 points
         
-        // Suspicious sender patterns
+        // Suspicious sender patterns (DLT route prefixes like AD-/DM-/VM- should NOT be treated as spam by default)
+        // Only lightly penalize classic ad routes while avoiding false positives for legitimate DLT senders
         if (senderUpper.startsWith("AD-") || senderUpper.startsWith("DM-")) {
-            score += 30
+            score += 10 // reduced from 30 to 10 to avoid over-filtering
         }
         
-        // All caps content (often spam)
-        if (contentLower != contentLower.lowercase() && contentLower.length > 10) {
-            val capsRatio = contentLower.count { it.isUpperCase() }.toFloat() / contentLower.length
+        // All caps content (often spam) - compute on ORIGINAL content, not lowercased
+        if (originalContent.length > 10) {
+            val uppercaseCount = originalContent.count { it.isUpperCase() }
+            val capsRatio = if (originalContent.isNotEmpty()) uppercaseCount.toFloat() / originalContent.length else 0f
             if (capsRatio > 0.7f) score += 20
         }
         
         // Multiple exclamation marks
-        val exclamationCount = contentLower.count { it == '!' }
+        val exclamationCount = originalContent.count { it == '!' }
         if (exclamationCount > 2) score += 15
+        
+        // Links (promotional often include links)
+        if (contentLower.contains("http")) score += 15
+        if (ClassificationConstants.SHORT_LINK_DOMAINS.any { contentLower.contains(it) }) score += 10
         
         return minOf(score, 100) // Cap at 100
     }
