@@ -500,8 +500,9 @@ private fun ImportantMessagesPage(
     Column(
         modifier = Modifier
             .fillMaxSize()
+            .verticalScroll(rememberScrollState())
             .padding(24.dp),
-        verticalArrangement = Arrangement.Center
+        verticalArrangement = Arrangement.Top
     ) {
         Icon(
             Icons.Filled.Star,
@@ -565,6 +566,9 @@ private fun ImportantMessagesPage(
                 )
             }
         }
+
+        // Extra bottom space to avoid overlap with bottom navigation area
+        Spacer(modifier = Modifier.height(120.dp))
     }
 }
 

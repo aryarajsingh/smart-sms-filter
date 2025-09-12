@@ -96,10 +96,28 @@ class SimpleMessageClassifier @Inject constructor(
     ): MessageCategory {
         val contentLower = content.lowercase()
         val senderUpper = sender.uppercase()
+
+        // --- Highest Priority: Explicit Spam Markers ---
+        if (contentLower.contains("airtel warning: spam") || 
+            contentLower.contains("airtel warning : spam") ||
+            contentLower.contains("warning: spam")) {
+            return MessageCategory.SPAM
+        }
         
-        // Always check for trusted senders first (regardless of preferences)
+        // FIRST: Check for explicit spam markers (Airtel Warning: SPAM)
+        if (contentLower.contains("airtel warning: spam") || 
+            contentLower.contains("airtel warning : spam") ||
+            contentLower.contains("warning: spam") ||
+            contentLower.contains("spam alert")) {
+            return MessageCategory.SPAM
+        }
+        
+        // Always check for trusted senders first (unless marked as spam)
         if (TRUSTED_SENDERS.any { senderUpper.contains(it) }) {
-            return MessageCategory.INBOX
+            // Even trusted senders can send spam warnings
+            if (!contentLower.contains("warning") && !contentLower.contains("spam")) {
+                return MessageCategory.INBOX
+            }
         }
         
         // Do NOT blanket block DLT route prefixes like VM-/RM-/VK-; treat neutral and rely on content/reputation

@@ -26,6 +26,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -34,6 +35,7 @@ import com.smartsmsfilter.domain.model.SmsMessage
 import com.smartsmsfilter.ui.theme.IOSSpacing
 import com.smartsmsfilter.ui.theme.IOSTypography
 import com.smartsmsfilter.ui.utils.formatRelativeTime
+import com.smartsmsfilter.ui.utils.resolveDisplayName
 import com.smartsmsfilter.ui.utils.getSenderDisplayName
 
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalFoundationApi::class)
@@ -163,17 +165,22 @@ fun PremiumConversationCard(
                     horizontalArrangement = Arrangement.SpaceBetween,
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Text(
-                        text = getSenderDisplayName(message.sender),
-                        style = IOSTypography.bodyLarge.copy(
-                            fontWeight = if (!message.isRead) FontWeight.Bold else FontWeight.SemiBold,
-                            fontSize = 16.sp
-                        ),
-                        color = MaterialTheme.colorScheme.onSurface,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis,
-                        modifier = Modifier.weight(1f)
-                    )
+                    run {
+                        val context = LocalContext.current
+                        val addressForName = message.sender
+                        val displayName = resolveDisplayName(context, addressForName)
+                        Text(
+                            text = displayName,
+                            style = IOSTypography.bodyLarge.copy(
+                                fontWeight = if (!message.isRead) FontWeight.Bold else FontWeight.SemiBold,
+                                fontSize = 16.sp
+                            ),
+                            color = MaterialTheme.colorScheme.onSurface,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                            modifier = Modifier.weight(1f)
+                        )
+                    }
                     
                     Spacer(modifier = Modifier.width(IOSSpacing.small))
                     
@@ -263,27 +270,13 @@ private fun ContactAvatar(
         modifier = modifier.size(52.dp),
         contentAlignment = Alignment.Center
     ) {
-        // Main avatar circle
+        // Main avatar circle - simplified for better light theme support
         Box(
             modifier = Modifier
                 .size(48.dp)
+                .clip(CircleShape)
                 .background(
-                    brush = if (isUnread) {
-                        Brush.radialGradient(
-                            colors = listOf(
-                                avatarColor.copy(alpha = 0.8f),
-                                avatarColor
-                            )
-                        )
-                    } else {
-                        Brush.radialGradient(
-                            colors = listOf(
-                                avatarColor.copy(alpha = 0.6f),
-                                avatarColor.copy(alpha = 0.8f)
-                            )
-                        )
-                    },
-                    shape = CircleShape
+                    color = if (isUnread) avatarColor else avatarColor.copy(alpha = 0.85f)
                 ),
             contentAlignment = Alignment.Center
         ) {
@@ -388,17 +381,33 @@ private fun getSenderInitials(sender: String): String {
     }
 }
 
+@Composable
 private fun getAvatarColor(sender: String): Color {
-    val colors = listOf(
-        Color(0xFF6366F1), // Indigo
-        Color(0xFF8B5CF6), // Purple  
-        Color(0xFFEC4899), // Pink
-        Color(0xFFEF4444), // Red
-        Color(0xFFF59E0B), // Amber
-        Color(0xFF10B981), // Emerald
-        Color(0xFF06B6D4), // Cyan
-        Color(0xFF3B82F6), // Blue
-    )
+    val isDarkTheme = androidx.compose.foundation.isSystemInDarkTheme()
+    val colors = if (isDarkTheme) {
+        listOf(
+            Color(0xFF6366F1), // Indigo
+            Color(0xFF8B5CF6), // Purple  
+            Color(0xFFEC4899), // Pink
+            Color(0xFFEF4444), // Red
+            Color(0xFFF59E0B), // Amber
+            Color(0xFF10B981), // Emerald
+            Color(0xFF06B6D4), // Cyan
+            Color(0xFF3B82F6), // Blue
+        )
+    } else {
+        // Lighter, more saturated colors for light theme
+        listOf(
+            Color(0xFF4F46E5), // Deeper Indigo
+            Color(0xFF7C3AED), // Deeper Purple  
+            Color(0xFFDB2777), // Deeper Pink
+            Color(0xFFDC2626), // Deeper Red
+            Color(0xFFD97706), // Deeper Amber
+            Color(0xFF059669), // Deeper Emerald
+            Color(0xFF0891B2), // Deeper Cyan
+            Color(0xFF2563EB), // Deeper Blue
+        )
+    }
     
     val hash = sender.hashCode()
     return colors[Math.abs(hash) % colors.size]

@@ -17,6 +17,13 @@ import kotlinx.coroutines.flow.catch
 import javax.inject.Inject
 import javax.inject.Singleton
 
+/**
+ * Concrete implementation of the [SmsRepository].
+ * This class is the single source of truth for all SMS message data, handling the complexities of
+ * database operations, transaction management, and mapping between data and domain models.
+ * @param dao The Data Access Object for SMS messages.
+ * @param database The Room database instance.
+ */
 @Singleton
 class SmsRepositoryImpl @Inject constructor(
     private val dao: SmsMessageDao,
@@ -43,17 +50,17 @@ class SmsRepositoryImpl @Inject constructor(
                 return@suspendResultOf -2L // Invalid message
             }
             
-            // Check for near-duplicates within a 60s window to avoid spam
-            val isNearDuplicate = dao.countNearDuplicate(
+            // Check for exact duplicates only (same sender, content, and exact timestamp)
+            val isDuplicate = dao.isDuplicate(
                 sender = message.sender,
                 content = message.content,
-                timestamp = message.timestamp.time,
-                windowMs = 60_000
+                timestamp = message.timestamp.time
             ) > 0
             
-            if (!isNearDuplicate) {
+            if (!isDuplicate) {
                 dao.insertMessage(message.toEntity())
             } else {
+                Log.d("SmsRepository", "Skipping duplicate message from ${message.sender}")
                 -1L // Indicate duplicate
             }
         } catch (e: Exception) {

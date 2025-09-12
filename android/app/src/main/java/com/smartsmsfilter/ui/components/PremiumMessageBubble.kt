@@ -24,7 +24,7 @@ fun PremiumMessageBubble(
     message: SmsMessage,
     modifier: Modifier = Modifier
 ) {
-    val isOutgoing = message.sender == "You"
+    val isOutgoing = message.isOutgoing
     val dateFormatter = SimpleDateFormat("MMM dd, HH:mm", Locale.getDefault())
     
     // Use dynamic colors from Material Theme

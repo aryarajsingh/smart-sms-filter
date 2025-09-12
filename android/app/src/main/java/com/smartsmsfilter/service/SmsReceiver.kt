@@ -103,12 +103,14 @@ class SmsReceiver : BroadcastReceiver() {
                 // Prepare domain message (category will be finalized by service)
                 val finalSender = senderValidation.getOrNull() ?: sender
                 val finalContent = contentValidation.getOrNull() ?: content
+                val normalizedSender = com.smartsmsfilter.ui.utils.normalizePhoneNumber(finalSender)
                 val provisionalMessage = DomainSmsMessage(
-                    sender = finalSender,
+                    sender = normalizedSender,
                     content = finalContent,
                     timestamp = timestamp,
                     category = com.smartsmsfilter.domain.model.MessageCategory.NEEDS_REVIEW,
-                    isRead = false
+                    isRead = false,
+                    isOutgoing = false
                 )
 
                 // Classify and store via service (handles DB write)

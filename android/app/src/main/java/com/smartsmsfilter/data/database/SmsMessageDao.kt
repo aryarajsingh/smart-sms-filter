@@ -4,25 +4,34 @@ import androidx.room.*
 import com.smartsmsfilter.data.model.SmsMessageEntity
 import kotlinx.coroutines.flow.Flow
 
+/**
+ * Data Access Object for the `sms_messages` table.
+ * Provides methods for querying and modifying SMS message data in the local database.
+ */
 @Dao
 interface SmsMessageDao {
     
+    /** Fetches all messages, sorted by timestamp descending. */
     @Query("SELECT * FROM sms_messages ORDER BY timestamp DESC")
     fun getAllMessages(): Flow<List<SmsMessageEntity>>
     
+    /** Fetches all active (not deleted or archived) messages for a given category. */
     @Query("SELECT * FROM sms_messages WHERE category = :category AND isDeleted = 0 AND isArchived = 0 ORDER BY timestamp DESC")
     fun getMessagesByCategory(category: String): Flow<List<SmsMessageEntity>>
     
+    /** Fetches all archived messages. */
     @Query("SELECT * FROM sms_messages WHERE isArchived = 1 AND isDeleted = 0 ORDER BY timestamp DESC")
     fun getArchivedMessages(): Flow<List<SmsMessageEntity>>
     
+    /** Fetches all messages that are not soft-deleted. */
     @Query("SELECT * FROM sms_messages WHERE isDeleted = 0 ORDER BY timestamp DESC")
     fun getAllActiveMessages(): Flow<List<SmsMessageEntity>>
     
     @Query("SELECT * FROM sms_messages WHERE id = :messageId")
     suspend fun getMessageById(messageId: Long): SmsMessageEntity?
     
-    @Insert
+    /** Inserts a single message. If the message already exists, it is replaced. */
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertMessage(message: SmsMessageEntity): Long
     
     @Update
@@ -80,6 +89,11 @@ interface SmsMessageDao {
     @Query("SELECT COUNT(*) FROM sms_messages WHERE sender = :sender AND content = :content AND ABS(timestamp - :timestamp) <= :windowMs")
     suspend fun countNearDuplicate(sender: String, content: String, timestamp: Long, windowMs: Long = 60000): Int
     
-    @Query("SELECT * FROM sms_messages WHERE sender = :address ORDER BY timestamp DESC")
+    /**
+     * Fetches all messages in a conversation thread, identified by the sender's normalized address.
+     * This includes both incoming and outgoing messages.
+     * @param address The normalized phone number of the conversation partner.
+     */
+    @Query("SELECT * FROM sms_messages WHERE (sender = :address OR threadId = :address) AND isDeleted = 0 ORDER BY timestamp ASC")
     fun getMessagesByAddress(address: String): Flow<List<SmsMessageEntity>>
 }

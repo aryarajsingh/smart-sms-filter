@@ -42,6 +42,8 @@ import androidx.lifecycle.lifecycleScope
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.delay
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalHapticFeedback
+import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.TextButton
@@ -75,6 +77,10 @@ class MainActivity : ComponentActivity() {
     // StateFlow for core permissions status
     private val _hasAllCorePermissions = MutableStateFlow(false)
     val hasAllCorePermissions = _hasAllCorePermissions.asStateFlow()
+
+    // StateFlow for minimal SMS permissions to proceed to onboarding
+    private val _hasSmsCorePermissions = MutableStateFlow(false)
+    val hasSmsCorePermissions = _hasSmsCorePermissions.asStateFlow()
     
     private val requestPermissionLauncher = registerForActivityResult(
         ActivityResultContracts.RequestMultiplePermissions()
@@ -96,11 +102,11 @@ class MainActivity : ComponentActivity() {
             delay(500) // Give system time to process
             checkDefaultSmsAppStatus()
             
-            // Provide feedback to user about the result
+            // Silent: no user toast here. Logging only.
             if (_isDefaultSmsApp.value) {
-                Toast.makeText(this@MainActivity, "Great! Smart SMS Filter is now your default SMS app.", Toast.LENGTH_LONG).show()
+                Log.d(TAG, "Default SMS set successfully")
             } else {
-                Toast.makeText(this@MainActivity, "Smart SMS Filter was not set as default. You can try again or set it manually in Settings.", Toast.LENGTH_LONG).show()
+                Log.d(TAG, "Default SMS not set by user")
             }
         }
     }
@@ -141,7 +147,7 @@ class MainActivity : ComponentActivity() {
         Log.d(TAG, "checkDefaultSmsAppStatus: roleHeld=$isCurrentlyDefault, telephonyDefault='$telephonyDefault', ourPackage='$packageName'")
 
         if (isCurrentlyDefault && !wasDefault) {
-            Toast.makeText(this, "Smart SMS Filter is now the default SMS app!", Toast.LENGTH_LONG).show()
+            Log.d(TAG, "Smart SMS Filter became the default SMS app")
         } else if (!isCurrentlyDefault && telephonyDefault != null) {
             Log.d(TAG, "Current telephony default SMS app is: $telephonyDefault")
         }
@@ -156,7 +162,6 @@ class MainActivity : ComponentActivity() {
         if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.KITKAT) {
             if (android.provider.Telephony.Sms.getDefaultSmsPackage(this) == packageName) {
                 Log.d(TAG, "Already the default SMS app.")
-                Toast.makeText(this, "Smart SMS Filter is already your default SMS app!", Toast.LENGTH_SHORT).show()
                 checkDefaultSmsAppStatus() // Ensure state is correct
                 return
             }
@@ -287,6 +292,7 @@ class MainActivity : ComponentActivity() {
         val notifications = if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.TIRAMISU) {
             ContextCompat.checkSelfPermission(this, android.Manifest.permission.POST_NOTIFICATIONS) == PackageManager.PERMISSION_GRANTED
         } else true
+        _hasSmsCorePermissions.value = smsPerms
         _hasAllCorePermissions.value = smsPerms && contacts && notifications
     }
     
@@ -323,6 +329,7 @@ fun SmartSmsFilterApp() {
     val smsViewModel: SmsViewModel = hiltViewModel() // Shared SmsViewModel instance
     val context = LocalContext.current
     val mainActivity = context as? MainActivity
+    val hapticFeedback = LocalHapticFeedback.current
 
     // Check if onboarding is completed
     val userPreferences by onboardingViewModel.userPreferences.collectAsState()
@@ -333,6 +340,8 @@ fun SmartSmsFilterApp() {
 
     // Collect the default SMS app status from MainActivity's StateFlow
     val isDefaultSmsApp by mainActivity?.isDefaultSmsApp?.collectAsState() ?: mutableStateOf(false)
+    val hasAllCorePermissions by mainActivity?.hasAllCorePermissions?.collectAsState() ?: mutableStateOf(false)
+    val hasSmsCorePermissions by mainActivity?.hasSmsCorePermissions?.collectAsState() ?: mutableStateOf(false)
 
     // Determine start destination based on onboarding status
     val preferences = userPreferences
@@ -356,22 +365,30 @@ fun SmartSmsFilterApp() {
                         containerColor = MaterialTheme.colorScheme.surfaceVariant
                     )
                 ) {
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(12.dp),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Column(modifier = Modifier.weight(1f)) {
-                            Text(
-                                "Make Smart SMS Filter your default SMS app",
-                                style = MaterialTheme.typography.bodyMedium,
-                                color = MaterialTheme.colorScheme.onSurface
-                            )
-                        }
-                        TextButton(onClick = { mainActivity?.requestDefaultSmsApp() }) {
-                            Text("Set default", color = MaterialTheme.colorScheme.primary)
+                    var dismissed by remember { mutableStateOf(false) }
+                    if (!dismissed) {
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(12.dp),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Column(modifier = Modifier.weight(1f)) {
+                                Text(
+                                    "Make Smart SMS Filter your default SMS app",
+                                    style = MaterialTheme.typography.bodyMedium,
+                                    color = MaterialTheme.colorScheme.onSurface
+                                )
+                            }
+                            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                TextButton(onClick = { mainActivity?.requestDefaultSmsApp() }) {
+                                    Text("Set default", color = MaterialTheme.colorScheme.primary)
+                                }
+                                TextButton(onClick = { dismissed = true }) {
+                                    Text("Dismiss", color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                }
+                            }
                         }
                     }
                 }
@@ -405,6 +422,7 @@ fun SmartSmsFilterApp() {
                     label = { Text("Inbox") },
                     selected = selectedTab == 0,
                     onClick = {
+                        hapticFeedback.performHapticFeedback(HapticFeedbackType.LongPress)
                         selectedTab = 0
                         smsViewModel.selectionState.setCurrentTab(MessageTab.INBOX)
                         navController.navigate(NavRoutes.Inbox.route) {
@@ -418,6 +436,7 @@ fun SmartSmsFilterApp() {
                     label = { Text("Spam") },
                     selected = selectedTab == 1,
                     onClick = {
+                        hapticFeedback.performHapticFeedback(HapticFeedbackType.LongPress)
                         selectedTab = 1
                         smsViewModel.selectionState.setCurrentTab(MessageTab.SPAM)
                         navController.navigate(NavRoutes.Spam.route) {
@@ -431,6 +450,7 @@ fun SmartSmsFilterApp() {
                     label = { Text("Review") },
                     selected = selectedTab == 2,
                     onClick = {
+                        hapticFeedback.performHapticFeedback(HapticFeedbackType.LongPress)
                         selectedTab = 2
                         smsViewModel.selectionState.setCurrentTab(MessageTab.REVIEW)
                         navController.navigate(NavRoutes.Review.route) {
@@ -452,20 +472,34 @@ fun SmartSmsFilterApp() {
                 SettingsScreen(onNavigateBack = { navController.popBackStack() })
             }
             composable(NavRoutes.Welcome.route) {
+                // Track if we initiated a permission request from Welcome
+                var requestedPermFromWelcome by remember { mutableStateOf(false) }
+
+                // Navigate automatically after permissions are granted
+                LaunchedEffect(hasSmsCorePermissions, requestedPermFromWelcome) {
+                    if (requestedPermFromWelcome && hasSmsCorePermissions) {
+                        navController.navigate(NavRoutes.Onboarding.route) {
+                            popUpTo(NavRoutes.Welcome.route) { inclusive = true }
+                        }
+                    }
+                }
+
                 WelcomeScreen(
                     onGetStarted = {
-                        navController.navigate(NavRoutes.Onboarding.route) {
-                            popUpTo(NavRoutes.Welcome.route) {
-                                inclusive = true
+                        if (!hasSmsCorePermissions) {
+                            requestedPermFromWelcome = true
+                            mainActivity?.requestAppPermissions()
+                        } else {
+                            navController.navigate(NavRoutes.Onboarding.route) {
+                                popUpTo(NavRoutes.Welcome.route) { inclusive = true }
                             }
                         }
                     },
                     onLearnMore = {
                         // TODO: Open website or show info dialog about privacy, features, how it works
-                        // Future: Launch browser intent to company website/privacy policy
                     },
-                    onRequestPermissions = { mainActivity?.requestAppPermissions() },
-                    onRequestDefaultSms = { mainActivity?.requestDefaultSmsApp() }
+                    onRequestPermissions = { /* Get Started handles permission prompts */ },
+                    onRequestDefaultSms = { /* Defer to onboarding dialog to avoid overlap on welcome */ }
                 )
             }
             

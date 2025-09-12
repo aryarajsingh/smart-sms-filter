@@ -179,8 +179,13 @@ class ContactManager @Inject constructor(
      */
     suspend fun getContactByPhoneNumber(phoneNumber: String): Contact? {
         try {
-            val formattedNumber = formatPhoneNumber(phoneNumber)
-            val cursor = context.contentResolver.query(
+            val original = phoneNumber
+            val normalized = normalizePhoneNumber(original)
+            val digitsOnly = normalized.filter { it.isDigit() }
+            val last10 = if (digitsOnly.length >= 10) digitsOnly.takeLast(10) else null
+
+            // 1) Try exact match on normalized number
+            context.contentResolver.query(
                 ContactsContract.CommonDataKinds.Phone.CONTENT_URI,
                 arrayOf(
                     ContactsContract.CommonDataKinds.Phone.CONTACT_ID,
@@ -190,26 +195,88 @@ class ContactManager @Inject constructor(
                     ContactsContract.CommonDataKinds.Phone.PHOTO_URI
                 ),
                 "${ContactsContract.CommonDataKinds.Phone.NUMBER} = ?",
-                arrayOf(formattedNumber),
+                arrayOf(normalized),
                 null
-            )
-            
-            cursor?.use { c ->
+            )?.use { c ->
                 if (c.moveToFirst()) {
                     val contactIdIndex = c.getColumnIndex(ContactsContract.CommonDataKinds.Phone.CONTACT_ID)
                     val nameIndex = c.getColumnIndex(ContactsContract.CommonDataKinds.Phone.DISPLAY_NAME)
                     val numberIndex = c.getColumnIndex(ContactsContract.CommonDataKinds.Phone.NUMBER)
                     val typeIndex = c.getColumnIndex(ContactsContract.CommonDataKinds.Phone.TYPE)
                     val photoIndex = c.getColumnIndex(ContactsContract.CommonDataKinds.Phone.PHOTO_URI)
-                    
+
                     return Contact(
                         id = c.getLong(contactIdIndex),
                         name = c.getString(nameIndex) ?: "Unknown",
-                        phoneNumber = c.getString(numberIndex) ?: phoneNumber,
+                        phoneNumber = c.getString(numberIndex) ?: original,
                         phoneType = getPhoneTypeLabel(c.getInt(typeIndex)),
                         photoUri = c.getString(photoIndex),
                         isFrequentContact = false
                     )
+                }
+            }
+
+            // 2) Try PhoneLookup filter
+            val uri = Uri.withAppendedPath(ContactsContract.PhoneLookup.CONTENT_FILTER_URI, Uri.encode(normalized))
+            context.contentResolver.query(
+                uri,
+                arrayOf(
+                    ContactsContract.PhoneLookup._ID,
+                    ContactsContract.PhoneLookup.DISPLAY_NAME,
+                    ContactsContract.PhoneLookup.NUMBER
+                ),
+                null,
+                null,
+                null
+            )?.use { c ->
+                if (c.moveToFirst()) {
+                    val idIdx = c.getColumnIndex(ContactsContract.PhoneLookup._ID)
+                    val nameIdx = c.getColumnIndex(ContactsContract.PhoneLookup.DISPLAY_NAME)
+                    val numberIdx = c.getColumnIndex(ContactsContract.PhoneLookup.NUMBER)
+                    return Contact(
+                        id = if (idIdx >= 0) c.getLong(idIdx) else 0,
+                        name = if (nameIdx >= 0) c.getString(nameIdx) ?: original else original,
+                        phoneNumber = if (numberIdx >= 0) c.getString(numberIdx) ?: original else original,
+                        phoneType = "Unknown",
+                        photoUri = null,
+                        isFrequentContact = false
+                    )
+                }
+            }
+
+            // 3) Fallback: last-10-digits LIKE match
+            if (last10 != null) {
+                val sel = "${ContactsContract.CommonDataKinds.Phone.NUMBER} LIKE ?"
+                val args = arrayOf("%$last10")
+                context.contentResolver.query(
+                    ContactsContract.CommonDataKinds.Phone.CONTENT_URI,
+                    arrayOf(
+                        ContactsContract.CommonDataKinds.Phone.CONTACT_ID,
+                        ContactsContract.CommonDataKinds.Phone.DISPLAY_NAME,
+                        ContactsContract.CommonDataKinds.Phone.NUMBER,
+                        ContactsContract.CommonDataKinds.Phone.TYPE,
+                        ContactsContract.CommonDataKinds.Phone.PHOTO_URI
+                    ),
+                    sel,
+                    args,
+                    null
+                )?.use { c ->
+                    if (c.moveToFirst()) {
+                        val contactIdIndex = c.getColumnIndex(ContactsContract.CommonDataKinds.Phone.CONTACT_ID)
+                        val nameIndex = c.getColumnIndex(ContactsContract.CommonDataKinds.Phone.DISPLAY_NAME)
+                        val numberIndex = c.getColumnIndex(ContactsContract.CommonDataKinds.Phone.NUMBER)
+                        val typeIndex = c.getColumnIndex(ContactsContract.CommonDataKinds.Phone.TYPE)
+                        val photoIndex = c.getColumnIndex(ContactsContract.CommonDataKinds.Phone.PHOTO_URI)
+
+                        return Contact(
+                            id = c.getLong(contactIdIndex),
+                            name = c.getString(nameIndex) ?: "Unknown",
+                            phoneNumber = c.getString(numberIndex) ?: original,
+                            phoneType = getPhoneTypeLabel(c.getInt(typeIndex)),
+                            photoUri = c.getString(photoIndex),
+                            isFrequentContact = false
+                        )
+                    }
                 }
             }
         } catch (e: Exception) {
@@ -251,6 +318,19 @@ class ContactManager @Inject constructor(
             context,
             android.Manifest.permission.READ_CONTACTS
         ) == PackageManager.PERMISSION_GRANTED
+    }
+    
+    /**
+     * Normalizes phone number for consistent comparison
+     * Removes all non-digit characters except + at the beginning
+     */
+    private fun normalizePhoneNumber(phoneNumber: String): String {
+        val cleaned = phoneNumber.trim()
+        return if (cleaned.startsWith("+")) {
+            "+" + cleaned.substring(1).replace(Regex("[^0-9]"), "")
+        } else {
+            cleaned.replace(Regex("[^0-9]"), "")
+        }
     }
 }
 

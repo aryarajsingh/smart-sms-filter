@@ -12,7 +12,8 @@ import kotlin.coroutines.resume
 
 @Singleton
 class SmsSenderManager @Inject constructor(
-    private val context: Context
+    private val context: Context,
+    private val rateLimiter: com.smartsmsfilter.security.RateLimiter
 ) {
     
     companion object {
@@ -40,6 +41,15 @@ class SmsSenderManager @Inject constructor(
             if (phoneNumber.isBlank() || message.isBlank()) {
                 continuation.resume(Result.failure(IllegalArgumentException("Phone number and message cannot be empty")))
                 return@suspendCancellableCoroutine
+            }
+            
+            // Check rate limits
+            kotlinx.coroutines.runBlocking {
+                val (canSend, errorMessage) = rateLimiter.canSendSms(phoneNumber)
+                if (!canSend) {
+                    continuation.resume(Result.failure(IllegalStateException(errorMessage ?: "Rate limit exceeded")))
+                    return@runBlocking
+                }
             }
             
             // Create pending intents for delivery tracking
@@ -88,6 +98,11 @@ class SmsSenderManager @Inject constructor(
                     deliveredIntents
                 )
                 Log.d(TAG, "Multi-part SMS sent (${parts.size} parts)")
+            }
+            
+            // Record the SMS for rate limiting
+            kotlinx.coroutines.runBlocking {
+                rateLimiter.recordSmsSent(phoneNumber)
             }
             
             // Return success - in a real app, you'd wait for the broadcast receiver

@@ -243,14 +243,11 @@ Icon(
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
-                Row(horizontalArrangement = Arrangement.spacedBy(PremiumSpacing.Small)) {
-                    Button(onClick = onRequestPermissions) { Text("Grant permissions") }
-                    OutlinedButton(onClick = onRequestDefaultSms) { Text("Set as default SMS app") }
-                }
+                // No inline buttons here; Get Started handles permission prompts.
             }
 
             // Extra bottom padding to ensure content is visible above action buttons
-            Spacer(modifier = Modifier.height(120.dp)) // Height of bottom action area + safe margin
+            Spacer(modifier = Modifier.height(220.dp)) // Generous padding to ensure full scrollable rationale
         }
         
         // Bottom action area
@@ -312,22 +309,6 @@ Icon(
                     }
                 }
 
-                // Minimal checklist hint
-                if (!hasAllPermissions || !isDefaultSms) {
-                    val hintColor = MaterialTheme.colorScheme.onSurfaceVariant
-                    Column(
-                        modifier = Modifier.fillMaxWidth(),
-                        verticalArrangement = Arrangement.spacedBy(4.dp)
-                    ) {
-                        if (!hasAllPermissions) {
-                            Text("• Grant SMS, Contacts, Notifications", color = hintColor, style = MaterialTheme.typography.bodySmall)
-                        }
-                        if (!isDefaultSms) {
-                            Text("• Set Smart SMS Filter as default SMS app", color = hintColor, style = MaterialTheme.typography.bodySmall)
-                        }
-                    }
-                }
-                
                 // Secondary CTA with subtle haptic
                 TextButton(
                     onClick = {

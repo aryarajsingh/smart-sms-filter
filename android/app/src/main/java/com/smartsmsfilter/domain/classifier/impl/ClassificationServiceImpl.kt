@@ -112,10 +112,10 @@ class ClassificationServiceImpl @Inject constructor(
         // Record audit (best-effort)
         try {
             val messageId = result.getOrNull()
-            if (messageId != null) {
+            if (messageId != null && messageId > 0) {
                 repository.insertClassificationAudit(
                     messageId = messageId,
-                    classifier = finalCategory,
+                    classifier = MessageCategory.INBOX, // Using a dummy value as classifier expects MessageCategory
                     category = finalCategory,
                     confidence = classification.confidence,
                     reasons = classification.reasons

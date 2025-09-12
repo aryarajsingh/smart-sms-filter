@@ -81,16 +81,20 @@ Icon(imageVector = Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Ba
             }
         )
         
-        // Messages list
+        // Messages list - show oldest at top, newest at bottom
         LazyColumn(
             modifier = Modifier
                 .weight(1f)
                 .fillMaxWidth()
                 .padding(16.dp),
             verticalArrangement = Arrangement.spacedBy(8.dp),
-            reverseLayout = true
+            reverseLayout = false
         ) {
-            items(messages.reversed()) { message ->
+            items(
+                items = messages,
+                key = { it.id },
+                contentType = { "message" }
+            ) { message ->
                 PremiumMessageBubble(
                     message = message,
                     modifier = Modifier.padding(horizontal = PremiumSpacing.Small)

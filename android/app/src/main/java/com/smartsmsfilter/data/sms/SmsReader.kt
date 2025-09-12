@@ -88,7 +88,7 @@ class SmsReader @Inject constructor(
     private fun loadMessagesFromUri(
         uri: Uri, 
         isOutgoing: Boolean, 
-        limit: Int = 1000
+        limit: Int = 10000
     ): List<SmsMessage> {
         val messages = mutableListOf<SmsMessage>()
         
@@ -111,7 +111,7 @@ class SmsReader @Inject constructor(
                 ),
                 null,
                 null,
-                "${Telephony.Sms.DATE} DESC LIMIT $limit"
+                "${Telephony.Sms.DATE} DESC"
             )
             
             cursor?.use { c ->
@@ -130,24 +130,26 @@ class SmsReader @Inject constructor(
                     val isRead = if (readIndex >= 0 && !c.isNull(readIndex)) c.getInt(readIndex) == 1 else false
                     val threadId = if (threadIndex >= 0 && !c.isNull(threadIndex)) c.getString(threadIndex) else null
                     
-                    val sender = if (isOutgoing) "You" else address
+                    // Normalize the address for consistency
+                    val normalizedAddress = normalizePhoneNumber(address)
                     
                     // Classify the message using simple rules
                     val category = if (isOutgoing) {
                         MessageCategory.INBOX // Sent messages go to inbox
                     } else {
-                        classifier.classifyMessage(sender, body)
+                        classifier.classifyMessage(normalizedAddress, body)
                     }
                     
                     messages.add(
                         SmsMessage(
                             id = id,
-                            sender = sender,
+                            sender = normalizedAddress,
                             content = body,
                             timestamp = Date(date),
                             category = category,
                             isRead = isRead,
-                            threadId = threadId
+                            threadId = normalizedAddress, // Use normalized address as threadId for consistency
+                            isOutgoing = isOutgoing
                         )
                     )
                 }
@@ -158,5 +160,18 @@ class SmsReader @Inject constructor(
         }
         
         return messages
+    }
+    
+    /**
+     * Normalizes phone number for consistent comparison
+     * Removes all non-digit characters except + at the beginning
+     */
+    private fun normalizePhoneNumber(phoneNumber: String): String {
+        val cleaned = phoneNumber.trim()
+        return if (cleaned.startsWith("+")) {
+            "+" + cleaned.substring(1).replace(Regex("[^0-9]"), "")
+        } else {
+            cleaned.replace(Regex("[^0-9]"), "")
+        }
     }
 }

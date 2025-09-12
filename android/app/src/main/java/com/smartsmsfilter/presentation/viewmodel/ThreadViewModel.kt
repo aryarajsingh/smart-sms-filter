@@ -35,10 +35,12 @@ class ThreadViewModel @Inject constructor(
     private var currentAddress: String = ""
 
     fun loadThread(address: String) {
-        currentAddress = address
+        // Normalize the address for consistent lookups
+        val normalized = com.smartsmsfilter.ui.utils.normalizePhoneNumber(address)
+        currentAddress = normalized
         viewModelScope.launch {
-            // Load messages for this address
-            smsRepository.getMessagesByAddress(address).collect { messageList ->
+            // Load messages for this normalized address
+            smsRepository.getMessagesByAddress(normalized).collect { messageList ->
                 _messages.value = messageList
             }
         }
@@ -81,13 +83,15 @@ class ThreadViewModel @Inject constructor(
                 result.fold(
 onSuccess = { _ ->
                         // Save sent message to database
+                        val normalized = com.smartsmsfilter.ui.utils.normalizePhoneNumber(currentAddress)
                         val sentMessage = SmsMessage(
-                            sender = "You", // Indicates outgoing message
+                            sender = normalized, // Store counterparty address, not "You"
                             content = message,
                             timestamp = Date(),
                             category = MessageCategory.INBOX,
                             isRead = true, // Sent messages are considered "read"
-                            threadId = currentAddress
+                            threadId = normalized,
+                            isOutgoing = true
                         )
                         
                         smsRepository.insertMessage(sentMessage)

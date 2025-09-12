@@ -30,7 +30,8 @@ data class SmsMessageEntity(
     val deletedAt: Long? = null,
     val manualCategoryOverride: String? = null, // User manually changed category
     val isImportant: Boolean = false, // User marked as important
-    val lastModified: Long = System.currentTimeMillis()
+    val lastModified: Long = System.currentTimeMillis(),
+    val isOutgoing: Boolean = false // True if sent by user
 )
 
 // Extension functions for mapping between domain and data models
@@ -45,7 +46,8 @@ fun SmsMessageEntity.toDomain() = com.smartsmsfilter.domain.model.SmsMessage(
     isArchived = isArchived,
     isDeleted = isDeleted,
     manualCategoryOverride = manualCategoryOverride?.let { MessageCategory.valueOf(it) },
-    isImportant = isImportant
+    isImportant = isImportant,
+    isOutgoing = isOutgoing
 )
 
 fun com.smartsmsfilter.domain.model.SmsMessage.toEntity() = SmsMessageEntity(
@@ -59,5 +61,6 @@ fun com.smartsmsfilter.domain.model.SmsMessage.toEntity() = SmsMessageEntity(
     isArchived = isArchived,
     isDeleted = isDeleted,
     manualCategoryOverride = manualCategoryOverride?.name,
-    isImportant = isImportant
+    isImportant = isImportant,
+    isOutgoing = isOutgoing
 )

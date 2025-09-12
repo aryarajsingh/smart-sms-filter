@@ -34,39 +34,55 @@ class SmsViewModel @Inject constructor(
     // Undo support
     private var lastOperation: LastOperation? = null
     
-    // UI State
+    // Expose a single state object to the UI
     private val _uiState = MutableStateFlow(SmsUiState())
     val uiState: StateFlow<SmsUiState> = _uiState.asStateFlow()
     
     // Selection State
     val selectionState = MessageSelectionState()
     
-    // Messages by category
-    val inboxMessages = getMessagesByCategoryUseCase(MessageCategory.INBOX)
-        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
-    
-    val spamMessages = getMessagesByCategoryUseCase(MessageCategory.SPAM)
-        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
-    
-    val reviewMessages = getMessagesByCategoryUseCase(MessageCategory.NEEDS_REVIEW)
-        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
-    
+    // Private flows for raw message data
+    private val inboxMessages = getMessagesByCategoryUseCase(MessageCategory.INBOX)
+    private val spamMessages = getMessagesByCategoryUseCase(MessageCategory.SPAM)
+    private val reviewMessages = getMessagesByCategoryUseCase(MessageCategory.NEEDS_REVIEW)
+
     init {
         // Load existing SMS messages from device on first launch
         loadExistingSmsMessages()
-        
-        // Update badge counts when messages change
-        combine(
-            inboxMessages,
-            spamMessages, 
-            reviewMessages
-        ) { inbox, spam, review ->
-            _uiState.value = _uiState.value.copy(
-                inboxCount = inbox.count { !it.isRead },
-                spamCount = spam.count { !it.isRead },
-                reviewCount = review.count { !it.isRead }
-            )
-        }.launchIn(viewModelScope)
+
+        // Combine raw data streams and transform them into UI state
+        viewModelScope.launch {
+            combine(
+                inboxMessages, 
+                spamMessages, 
+                reviewMessages
+            ) { inbox, spam, review ->
+                // Group conversations for the inbox view
+                val inboxConversations = inbox
+                    .groupBy { com.smartsmsfilter.ui.utils.normalizePhoneNumber(it.sender) }
+                    .values
+                    .mapNotNull { group -> group.maxByOrNull { m -> m.timestamp } }
+                    .sortedByDescending { it.timestamp }
+
+                // Update the single UI state object
+                _uiState.update {
+                    it.copy(
+                        inboxMessages = inboxConversations,
+                        spamMessages = spam,
+                        reviewMessages = review,
+                        inboxUnreadCount = inbox.count { !it.isRead },
+                        spamTotalCount = spam.size,
+                        reviewUnreadCount = review.count { !it.isRead },
+                        isLoading = false
+                    )
+                }
+            }.collect()
+        }
+    }
+    
+    private fun refreshMessageCounts() {
+        // This function is now implicitly handled by the combine flow
+        // but can be kept for explicit refresh if needed elsewhere.
     }
     
     fun updateMessageCategory(messageId: Long, category: MessageCategory) {
@@ -74,6 +90,8 @@ class SmsViewModel @Inject constructor(
             val result = updateMessageCategoryUseCase(messageId, category)
             result.fold(
                 onSuccess = {
+                    // Force refresh of message counts
+                    refreshMessageCounts()
                     _uiState.value = _uiState.value.copy(
                         message = "Message moved to ${category.name.lowercase()}"
                     )
@@ -243,6 +261,8 @@ class SmsViewModel @Inject constructor(
                         android.util.Log.d("SmsViewModel", "Batch move successful, clearing selection")
                         lastOperation = LastOperation(OperationType.MoveCategory, selectedIds, prevMap)
                         selectionState.clearSelection(tab)
+                        // Force refresh of message counts after batch move
+                        refreshMessageCounts()
                         _uiState.value = _uiState.value.copy(
                             message = "${selectedIds.size} message(s) moved to ${category.name.lowercase()}"
                         )
@@ -379,7 +399,8 @@ class SmsViewModel @Inject constructor(
         viewModelScope.launch {
             try {
                 _uiState.value = _uiState.value.copy(isLoading = true)
-                smsReader.loadRecentSmsMessages(100).collect { messages ->
+                // Load a comprehensive set of messages on first open to avoid fragmented threads
+                smsReader.loadAllSmsMessages().collect { messages ->
                     // Save messages to database if they don't exist
                     messages.forEach { message ->
                         try {
@@ -409,10 +430,13 @@ data class LastOperation(
 )
 
 data class SmsUiState(
-    val inboxCount: Int = 0,
-    val spamCount: Int = 0,
-    val reviewCount: Int = 0,
-    val isLoading: Boolean = false,
+    val inboxMessages: List<SmsMessage> = emptyList(),
+    val spamMessages: List<SmsMessage> = emptyList(),
+    val reviewMessages: List<SmsMessage> = emptyList(),
+    val inboxUnreadCount: Int = 0,
+    val spamTotalCount: Int = 0,
+    val reviewUnreadCount: Int = 0,
+    val isLoading: Boolean = true, // Start with loading state
     val error: String? = null,
     val message: String? = null
 )

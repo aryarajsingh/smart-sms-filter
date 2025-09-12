@@ -94,13 +94,15 @@ class ComposeMessageViewModel @Inject constructor(
                 result.fold(
 onSuccess = { _ ->
                         // Save sent message to database
+                        val normalized = com.smartsmsfilter.ui.utils.normalizePhoneNumber(recipient.phoneNumber)
                         val sentMessage = SmsMessage(
-                            sender = "You", // Indicates outgoing message
+                            sender = normalized, // Store counterparty address, not "You"
                             content = message,
                             timestamp = Date(),
                             category = MessageCategory.INBOX,
                             isRead = true, // Sent messages are considered "read"
-                            threadId = recipient.phoneNumber
+                            threadId = normalized,
+                            isOutgoing = true
                         )
                         
                         smsRepository.insertMessage(sentMessage)

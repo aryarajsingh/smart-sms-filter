@@ -13,7 +13,9 @@ data class SmsMessage(
     val isArchived: Boolean = false,
     val isDeleted: Boolean = false,
     val manualCategoryOverride: MessageCategory? = null,
-    val isImportant: Boolean = false
+    val isImportant: Boolean = false,
+    // True if this message was sent by the user (outgoing). Used for UI alignment/colors.
+    val isOutgoing: Boolean = false
 )
 
 enum class MessageCategory {

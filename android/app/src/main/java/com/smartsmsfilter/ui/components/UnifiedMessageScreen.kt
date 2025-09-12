@@ -40,9 +40,9 @@ import kotlinx.coroutines.launch
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class, ExperimentalFoundationApi::class)
 @Composable
 fun UnifiedMessageScreen(
-    messagesFlow: StateFlow<List<SmsMessage>>,
+    messages: List<SmsMessage>,
     viewModel: SmsViewModel,
-    tab: MessageTab, // Add tab parameter to identify which tab this is
+    tab: MessageTab,
     onNavigateToThread: (String) -> Unit,
     screenTitle: String,
     emptyStateTitle: String,
@@ -50,9 +50,11 @@ fun UnifiedMessageScreen(
     showCategoryInCards: Boolean = false,
     enableCategoryChange: Boolean = false,
     modifier: Modifier = Modifier,
-    onSettingsClick: (() -> Unit)? = null
+    onSettingsClick: (() -> Unit)? = null,
+    groupBySender: Boolean = false, // Kept for flexibility, though logic moved
+    unreadCount: Int? = null,
+    totalCount: Int? = null
 ) {
-    val messages by messagesFlow.collectAsStateWithLifecycle()
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     val snackbarHostState = remember { SnackbarHostState() }
     var showWhyDialog by remember { mutableStateOf(false) }
@@ -130,10 +132,15 @@ fun UnifiedMessageScreen(
                     }
                 }
                 
-                // Unread count with appropriate color per screen
-                if (messages.count { !it.isRead } > 0) {
+                // Message count with appropriate color per screen
+                val countText = when {
+                    totalCount != null -> if (totalCount > 0) "$totalCount spam message${if (totalCount != 1) "s" else ""}" else null
+                    unreadCount != null -> if (unreadCount > 0) "$unreadCount unread" else null
+                    else -> null
+                }
+                if (countText != null) {
                     Text(
-                        text = "${messages.count { !it.isRead }} ${if (screenTitle == "Spam") "spam messages" else "unread"}",
+                        text = countText,
                         style = IOSTypography.titleMedium,
                         color = when (screenTitle) {
                             "Spam" -> MaterialTheme.colorScheme.error
@@ -205,6 +212,7 @@ fun UnifiedMessageScreen(
             }
         } else {
             // Unified message list with consistent behavior
+            val listToShow = messages // Data is now pre-processed
             LazyColumn(
                 modifier = Modifier.fillMaxSize(),
                 contentPadding = PaddingValues(
@@ -213,7 +221,11 @@ fun UnifiedMessageScreen(
                 ),
                 verticalArrangement = Arrangement.spacedBy(IOSSpacing.small)
             ) {
-                items(messages, key = { it.id }) { message ->
+                items(
+                    items = listToShow, 
+                    key = { it.id },
+                    contentType = { "message" } // Help compose optimize
+                ) { message ->
                     AnimatedVisibility(
                         visible = true,
                         enter = fadeIn(animationSpec = tween(120)) + scaleIn(initialScale = 0.98f, animationSpec = tween(120)),

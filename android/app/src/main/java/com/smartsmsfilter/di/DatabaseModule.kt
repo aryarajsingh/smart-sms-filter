@@ -11,6 +11,7 @@ import com.smartsmsfilter.data.sms.SmsReader
 import com.smartsmsfilter.domain.repository.SmsRepository
 import com.smartsmsfilter.classification.SimpleMessageClassifier
 import com.smartsmsfilter.data.preferences.PreferencesManager
+import com.smartsmsfilter.security.RateLimiter
 import dagger.Module
 import dagger.Provides
 import dagger.hilt.InstallIn
@@ -25,13 +26,7 @@ object DatabaseModule {
     @Provides
     @Singleton
     fun provideDatabase(@ApplicationContext context: Context): SmsDatabase {
-        return Room.databaseBuilder(
-            context,
-            SmsDatabase::class.java,
-            SmsDatabase.DATABASE_NAME
-        )
-        .fallbackToDestructiveMigration()
-        .build()
+        return SmsDatabase.getDatabase(context)
     }
     
     @Provides
@@ -47,8 +42,17 @@ object DatabaseModule {
     
     @Provides
     @Singleton
-    fun provideSmsSenderManager(@ApplicationContext context: Context): SmsSenderManager {
-        return SmsSenderManager(context)
+    fun provideSmsSenderManager(
+        @ApplicationContext context: Context,
+        rateLimiter: RateLimiter
+    ): SmsSenderManager {
+        return SmsSenderManager(context, rateLimiter)
+    }
+    
+    @Provides
+    @Singleton
+    fun provideRateLimiter(@ApplicationContext context: Context): RateLimiter {
+        return RateLimiter(context)
     }
     
     @Provides
