@@ -28,7 +28,10 @@ All notable changes to this project will be documented in this file.
 
 The format is inspired by Keep a Changelog. Dates are in YYYY-MM-DD.
 
-## [1.2.0] - 2024-12-09
+## [1.2.1] - 2025-09-12
+
+### Fixed
+- Fixed a bug that caused duplicate notifications for the same message by ensuring the `SmsReceiver` only processes one intent per message and by using stable notification IDs.
 ### Security Enhancements
 - **Encryption Manager**: Added Android Keystore-based encryption for sensitive data using AES/GCM with 256-bit keys
 - **Rate Limiting**: Implemented comprehensive rate limiting for SMS sending (30/hour, 100/day, 5/hour per number) to prevent abuse

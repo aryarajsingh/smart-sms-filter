@@ -1,6 +1,6 @@
 # Smart SMS Filter - Android App
 
-[![Version](https://img.shields.io/badge/version-1.2.0-blue.svg)](CHANGELOG.md)
+[![Version](https://img.shields.io/badge/version-1.2.1-blue.svg)](CHANGELOG.md)
 [![Platform](https://img.shields.io/badge/platform-Android-green.svg)](https://www.android.com)
 [![API](https://img.shields.io/badge/API-24%2B-brightgreen.svg)](https://android-arsenal.com/api?level=24)
 [![License](https://img.shields.io/badge/license-MIT-orange.svg)](LICENSE)
@@ -9,12 +9,9 @@
 
 Smart SMS Filter is a **privacy-first, security-hardened** SMS inbox that uses advanced on-device AI to organize your messages intelligently. Version 1.2.0 brings comprehensive security enhancements, performance optimizations, and code quality improvements that make the app faster, safer, and more reliable than ever.
 
-### 🚀 What's New in v1.2.0
-- **🔐 Enhanced Security**: Android Keystore encryption, rate limiting, input validation
-- **⚡ Performance Boost**: Optimized database queries, caching, memory management
-- **🐛 Critical Bug Fixes**: Phone normalization, dependency injection, UI compilation
-- **📝 Complete Documentation**: Every public API documented with KDoc
-- **✨ Code Quality**: Comprehensive audit of all layers, improved error handling
+### 🚀 What's New in v1.2.1
+
+- **🐛 Bug Fixes**: Fixed a critical bug that caused duplicate notifications for the same message.
 
 ## 🚀 Quick Start
 

@@ -31,7 +31,10 @@ class SmartNotificationManager @Inject constructor(
         const val CHANNEL_NEEDS_REVIEW = "needs_review_messages"
         
         // Notification IDs
-        private var notificationId = 1000
+        private fun getNotificationId(sender: String): Int {
+            // Use a hash of the sender's address to create a stable notification ID
+            return sender.hashCode()
+        }
         
         // Channel priorities
         const val PRIORITY_IMPORTANT = NotificationCompat.PRIORITY_HIGH
@@ -189,7 +192,9 @@ class SmartNotificationManager @Inject constructor(
     }
     
     /**
-     * Actually display the notification
+     * Shows a notification for the given message. To prevent duplicate notifications,
+     * this method uses a stable notification ID for each conversation, which is
+     * generated from a hash of the sender's address.
      */
     private fun showNotification(
         message: SmsMessage,
@@ -269,8 +274,9 @@ class SmartNotificationManager @Inject constructor(
         with(NotificationManagerCompat.from(context)) {
             try {
                 val notification = builder.build()
+                val notificationId = getNotificationId(message.sender)
                 android.util.Log.d("SmartNotificationManager", "Notification built successfully, showing with ID: $notificationId")
-                notify(notificationId++, notification)
+                notify(notificationId, notification)
                 android.util.Log.d("SmartNotificationManager", "Notification shown successfully")
             } catch (e: SecurityException) {
                 android.util.Log.e("SmartNotificationManager", "SecurityException showing notification", e)

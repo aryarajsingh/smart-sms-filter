@@ -1,8 +1,8 @@
-﻿<!-- This file is auto-generated from android/README.md. Do not edit directly. -->
+<!-- This file is auto-generated from android/README.md. Do not edit directly. -->
 <!-- Last synchronized: 2025-09-12 17:03:36 -->
 # Smart SMS Filter - Android App
 
-[![Version](https://img.shields.io/badge/version-1.2.0-blue.svg)](android/CHANGELOG.md)
+[![Version](https://img.shields.io/badge/version-1.2.1-blue.svg)](android/CHANGELOG.md)
 [![Platform](https://img.shields.io/badge/platform-Android-green.svg)](https://www.android.com)
 [![API](https://img.shields.io/badge/API-24%2B-brightgreen.svg)](https://android-arsenal.com/api?level=24)
 [![License](https://img.shields.io/badge/license-MIT-orange.svg)](LICENSE)
@@ -11,14 +11,11 @@
 
 Smart SMS Filter is a **privacy-first, security-hardened** SMS inbox that uses advanced on-device AI to organize your messages intelligently. Version 1.2.0 brings comprehensive security enhancements, performance optimizations, and code quality improvements that make the app faster, safer, and more reliable than ever.
 
-### ðŸš€ What's New in v1.2.0
-- **ðŸ” Enhanced Security**: Android Keystore encryption, rate limiting, input validation
-- **âš¡ Performance Boost**: Optimized database queries, caching, memory management
-- **ðŸ› Critical Bug Fixes**: Phone normalization, dependency injection, UI compilation
-- **ðŸ“ Complete Documentation**: Every public API documented with KDoc
-- **âœ¨ Code Quality**: Comprehensive audit of all layers, improved error handling
+### 🚀 What's New in v1.2.1
 
-## ðŸš€ Quick Start
+- **🐛 Bug Fixes**: Fixed a critical bug that caused duplicate notifications for the same message.
+
+## 🚀 Quick Start
 
 1. **Clone the repository**
    ```bash
@@ -44,11 +41,11 @@ Smart SMS Filter is a **privacy-first, security-hardened** SMS inbox that uses a
 
 ## Technical Stack
 
-## ðŸ“ Project Structure
+## 📁 Project Structure
 
-The main Android application is located in the ndroid/ directory. All development should be done there.
+The main Android application is located in the android/ directory. All development should be done there.
 
-\\\
+```
 smart-sms-filter/
 â”œâ”€â”€ android/          # Main Android application
 â”‚   â”œâ”€â”€ app/         # Application module
@@ -58,9 +55,9 @@ smart-sms-filter/
 â”œâ”€â”€ models/          # ML models (future)
 â”œâ”€â”€ scripts/         # Utility scripts
 â””â”€â”€ README.md        # Auto-synced from android/README.md
-\\\
+```
 
-> **Note:** Always edit documentation in ndroid/ directory. Root files are auto-synchronized.
+> **Note:** Always edit documentation in android/ directory. Root files are auto-synchronized.
 
 
 - **Language**: Kotlin
@@ -90,7 +87,7 @@ android/
 
 ## Key Features
 
-### ðŸŒŸ Core Capabilities
+### 🌟 Core Capabilities
 
 #### Welcome and Onboarding
 - **Privacy-First Introduction**: Learn what the app does before any permission prompts
@@ -148,7 +145,7 @@ The app requests permissions and default SMS role only after explaining why. Ess
 - RECEIVE_SMS, READ_SMS, SEND_SMS
 - READ_CONTACTS
 - POST_NOTIFICATIONS (Android 13+)
-- Default SMS role via RoleManager (Android 10+) or Telephony API (Android 4.4â€“9)
+- Default SMS role via RoleManager (Android 10+) or Telephony API (Android 4.4-9)
 
 ## Architecture Details
 

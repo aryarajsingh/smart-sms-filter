@@ -7,19 +7,28 @@ plugins {
 }
 
 android {
-    // Ensure unit tests can access android resources where needed
-    testOptions {
-        unitTests.includeAndroidResources = true
-    }
     namespace 'com.smartsmsfilter'
     compileSdk rootProject.compileSdk
+
+    signingConfigs {
+        release {
+            def keystorePropertiesFile = rootProject.file('keystore.properties')
+            def keystoreProperties = new Properties()
+            keystoreProperties.load(new FileInputStream(keystorePropertiesFile))
+
+            storeFile rootProject.file(keystoreProperties['storeFile'])
+            storePassword keystoreProperties['storePassword']
+            keyAlias keystoreProperties['keyAlias']
+            keyPassword keystoreProperties['keyPassword']
+        }
+    }
 
     defaultConfig {
         applicationId "com.smartsmsfilter"
         minSdk rootProject.minSdk
         targetSdk rootProject.targetSdk
         versionCode 5
-        versionName "1.2.0" // Security and performance overhaul release
+        versionName "1.2.1" // Security and performance overhaul release
 
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
         vectorDrawables {
@@ -36,6 +45,7 @@ android {
         release {
             minifyEnabled true
             proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
+            signingConfig signingConfigs.release
         }
         debug {
             minifyEnabled false

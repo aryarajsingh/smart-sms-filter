@@ -20,6 +20,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.launch
 import java.util.Date
+import com.smartsmsfilter.utils.DefaultSmsAppHelper
 import javax.inject.Inject
 
 @AndroidEntryPoint
@@ -42,37 +43,61 @@ class SmsReceiver : BroadcastReceiver() {
     companion object {
         private const val TAG = "SmsReceiver"
     }
-    
+    /**
+     * This BroadcastReceiver is responsible for intercepting incoming SMS messages.
+     * It listens for two intents: `SMS_DELIVER_ACTION` and `SMS_RECEIVED_ACTION`.
+     *
+     * To avoid duplicate notifications, it uses the `DefaultSmsAppHelper` to check
+     * if the app is the default SMS app. If it is, it only processes the
+     * `SMS_DELIVER_ACTION`. If it's not the default app, it processes the
+     * `SMS_RECEIVED_ACTION` and aborts the broadcast to prevent the system's
+     * default SMS app from also processing the message.
+     */
     override fun onReceive(context: Context?, intent: Intent?) {
-        Log.d(TAG, "=== SMS RECEIVER TRIGGERED ===")
-        Log.d(TAG, "Action: ${intent?.action}")
-        Log.d(TAG, "Intent extras: ${intent?.extras?.keySet()}")
-        
         if (context == null || intent == null) {
             Log.w(TAG, "Received null context or intent")
             return
         }
-        
-        if (intent.action == Telephony.Sms.Intents.SMS_RECEIVED_ACTION || 
-            intent.action == "android.provider.Telephony.SMS_DELIVER") {
+
+        val isDefaultSmsApp = DefaultSmsAppHelper.isDefaultSmsApp(context)
+        val action = intent.action
+
+        val shouldProcess = when {
+            isDefaultSmsApp && action == Telephony.Sms.Intents.SMS_DELIVER_ACTION -> {
+                Log.d(TAG, "Processing as default SMS app")
+                true
+            }
+            !isDefaultSmsApp && action == Telephony.Sms.Intents.SMS_RECEIVED_ACTION -> {
+                Log.d(TAG, "Processing as non-default SMS app")
+                true
+            }
+            else -> {
+                Log.d(TAG, "Skipping SMS broadcast. isDefault: $isDefaultSmsApp, action: $action")
+                false
+            }
+        }
+
+        if (shouldProcess) {
             try {
                 val messages = Telephony.Sms.Intents.getMessagesFromIntent(intent)
-                
+
                 if (messages.isNullOrEmpty()) {
                     Log.w(TAG, "No SMS messages found in intent")
                     return
                 }
-                
+
                 // Process each message with proper error handling
                 messages.forEach { smsMessage ->
                     processSmsMessageSafely(smsMessage)
                 }
-                
+
+                if (!isDefaultSmsApp) {
+                    abortBroadcast()
+                }
+
             } catch (e: Exception) {
                 Log.e(TAG, "Error processing SMS intent", e)
             }
-        } else {
-            Log.w(TAG, "Received unhandled SMS action: ${intent.action}")
         }
     }
     
