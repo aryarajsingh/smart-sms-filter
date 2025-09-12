@@ -1,0 +1,75 @@
+name: Sync Documentation
+
+on:
+  push:
+    branches: [ master, main ]
+    paths:
+      - 'android/README.md'
+      - 'android/CHANGELOG.md'
+  workflow_dispatch:
+
+jobs:
+  sync-docs:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v3
+      with:
+        token: ${{ secrets.GITHUB_TOKEN }}
+    
+    - name: Setup Node.js
+      uses: actions/setup-node@v3
+      with:
+        node-version: '18'
+    
+    - name: Sync documentation files
+      run: |
+        echo "Syncing documentation from android/ to root..."
+        
+        # Copy README with header
+        echo "<!-- This file is auto-generated from android/README.md. Do not edit directly. -->" > README.md
+        echo "<!-- Last synchronized: $(date -u +"%Y-%m-%d %H:%M:%S UTC") -->" >> README.md
+        echo "" >> README.md
+        cat android/README.md >> README.md
+        
+        # Add project structure note
+        cat << 'EOF' >> README.md
+
+## 📁 Project Structure
+
+The main Android application is located in the `android/` directory. All development should be done there.
+
+```
+smart-sms-filter/
+├── android/          # Main Android application
+│   ├── app/         # Application module  
+│   ├── gradle/      # Gradle wrapper
+│   └── README.md    # Source documentation (edit this)
+├── docs/            # Additional documentation
+├── models/          # ML models (future)
+├── scripts/         # Utility scripts
+└── README.md        # Auto-synced from android/README.md
+```
+
+> **Note:** Always edit documentation in `android/` directory. Root files are auto-synchronized.
+EOF
+        
+        # Copy CHANGELOG
+        cp android/CHANGELOG.md CHANGELOG.md
+        
+        echo "Documentation sync complete"
+    
+    - name: Check for changes
+      id: git-check
+      run: |
+        git diff --exit-code || echo "changed=true" >> $GITHUB_OUTPUT
+    
+    - name: Commit and push if changed
+      if: steps.git-check.outputs.changed == 'true'
+      run: |
+        git config --local user.email "action@github.com"
+        git config --local user.name "GitHub Action"
+        git add README.md CHANGELOG.md
+        git commit -m "docs: Auto-sync documentation from android directory [skip ci]"
+        git push

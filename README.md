@@ -1,6 +1,8 @@
+﻿<!-- This file is auto-generated from android/README.md. Do not edit directly. -->
+<!-- Last synchronized: 2025-09-12 17:03:36 -->
 # Smart SMS Filter - Android App
 
-[![Version](https://img.shields.io/badge/version-1.2.0-blue.svg)](CHANGELOG.md)
+[![Version](https://img.shields.io/badge/version-1.2.0-blue.svg)](android/CHANGELOG.md)
 [![Platform](https://img.shields.io/badge/platform-Android-green.svg)](https://www.android.com)
 [![API](https://img.shields.io/badge/API-24%2B-brightgreen.svg)](https://android-arsenal.com/api?level=24)
 [![License](https://img.shields.io/badge/license-MIT-orange.svg)](LICENSE)
@@ -9,19 +11,19 @@
 
 Smart SMS Filter is a **privacy-first, security-hardened** SMS inbox that uses advanced on-device AI to organize your messages intelligently. Version 1.2.0 brings comprehensive security enhancements, performance optimizations, and code quality improvements that make the app faster, safer, and more reliable than ever.
 
-### 🚀 What's New in v1.2.0
-- **🔐 Enhanced Security**: Android Keystore encryption, rate limiting, input validation
-- **⚡ Performance Boost**: Optimized database queries, caching, memory management
-- **🐛 Critical Bug Fixes**: Phone normalization, dependency injection, UI compilation
-- **📝 Complete Documentation**: Every public API documented with KDoc
-- **✨ Code Quality**: Comprehensive audit of all layers, improved error handling
+### ðŸš€ What's New in v1.2.0
+- **ðŸ” Enhanced Security**: Android Keystore encryption, rate limiting, input validation
+- **âš¡ Performance Boost**: Optimized database queries, caching, memory management
+- **ðŸ› Critical Bug Fixes**: Phone normalization, dependency injection, UI compilation
+- **ðŸ“ Complete Documentation**: Every public API documented with KDoc
+- **âœ¨ Code Quality**: Comprehensive audit of all layers, improved error handling
 
-## 🚀 Quick Start
+## ðŸš€ Quick Start
 
 1. **Clone the repository**
    ```bash
    git clone https://github.com/aryarajsingh/smart-sms-filter.git
-   cd smart-sms-filter/android
+   cd smart-sms-filter
    ```
 
 2. **Open in Android Studio**
@@ -31,7 +33,7 @@ Smart SMS Filter is a **privacy-first, security-hardened** SMS inbox that uses a
 
 3. **Build and Run**
    ```bash
-   ./gradlew assembleDebug
+   ./android/gradlew assembleDebug
    # Or use Android Studio's Run button
    ```
 
@@ -41,6 +43,25 @@ Smart SMS Filter is a **privacy-first, security-hardened** SMS inbox that uses a
    - Run the app from Android Studio
 
 ## Technical Stack
+
+## ðŸ“ Project Structure
+
+The main Android application is located in the ndroid/ directory. All development should be done there.
+
+\\\
+smart-sms-filter/
+â”œâ”€â”€ android/          # Main Android application
+â”‚   â”œâ”€â”€ app/         # Application module
+â”‚   â”œâ”€â”€ gradle/      # Gradle wrapper
+â”‚   â””â”€â”€ README.md    # Source documentation (edit this)
+â”œâ”€â”€ docs/            # Additional documentation
+â”œâ”€â”€ models/          # ML models (future)
+â”œâ”€â”€ scripts/         # Utility scripts
+â””â”€â”€ README.md        # Auto-synced from android/README.md
+\\\
+
+> **Note:** Always edit documentation in ndroid/ directory. Root files are auto-synchronized.
+
 
 - **Language**: Kotlin
 - **UI Framework**: Jetpack Compose
@@ -55,21 +76,21 @@ Smart SMS Filter is a **privacy-first, security-hardened** SMS inbox that uses a
 
 ```
 android/
-├── app/
-│   ├── src/main/java/com/smartsmsfilter/
-│   │   ├── ui/           # Compose UI components
-│   │   ├── data/         # Repository, database, data sources
-│   │   ├── domain/       # Use cases, entities
-│   │   ├── presentation/ # ViewModels and UI state
-│   │   └── ml/           # TensorFlow Lite integration
-│   └── build.gradle      # App dependencies
-├── gradle/               # Gradle wrapper files
-└── build.gradle          # Project-level configuration
+â”œâ”€â”€ app/
+â”‚   â”œâ”€â”€ src/main/java/com/smartsmsfilter/
+â”‚   â”‚   â”œâ”€â”€ ui/           # Compose UI components
+â”‚   â”‚   â”œâ”€â”€ data/         # Repository, database, data sources
+â”‚   â”‚   â”œâ”€â”€ domain/       # Use cases, entities
+â”‚   â”‚   â”œâ”€â”€ presentation/ # ViewModels and UI state
+â”‚   â”‚   â””â”€â”€ ml/           # TensorFlow Lite integration
+â”‚   â””â”€â”€ build.gradle      # App dependencies
+â”œâ”€â”€ gradle/               # Gradle wrapper files
+â””â”€â”€ build.gradle          # Project-level configuration
 ```
 
 ## Key Features
 
-### 🌟 Core Capabilities
+### ðŸŒŸ Core Capabilities
 
 #### Welcome and Onboarding
 - **Privacy-First Introduction**: Learn what the app does before any permission prompts
@@ -127,7 +148,7 @@ The app requests permissions and default SMS role only after explaining why. Ess
 - RECEIVE_SMS, READ_SMS, SEND_SMS
 - READ_CONTACTS
 - POST_NOTIFICATIONS (Android 13+)
-- Default SMS role via RoleManager (Android 10+) or Telephony API (Android 4.4–9)
+- Default SMS role via RoleManager (Android 10+) or Telephony API (Android 4.4â€“9)
 
 ## Architecture Details
 
@@ -188,19 +209,19 @@ Model specifications:
 
 ## Performance Improvements (v1.2.0)
 
-### ⚡ Speed Optimizations
+### âš¡ Speed Optimizations
 - **Phone Number Caching**: Normalized phone numbers cached for instant contact resolution
 - **Database Indexing**: Proper indexes on frequently queried columns
 - **Async Processing**: All heavy operations moved off the UI thread
 - **Batch Operations**: Efficient bulk message operations
 
-### 💾 Memory Management
+### ðŸ’¾ Memory Management
 - **Coroutine Scope Management**: Fixed memory leaks with proper scope handling
 - **Lazy Loading**: Messages loaded on-demand with pagination
 - **Resource Cleanup**: Automatic cleanup of unused resources
 - **Optimized Caching**: Smart cache invalidation strategies
 
-### 📊 Performance Metrics
+### ðŸ“Š Performance Metrics
 - **Model inference**: <100ms on average
 - **Message loading**: 50% faster with caching
 - **Memory usage**: <200MB including model
@@ -209,13 +230,13 @@ Model specifications:
 
 ## Security Features (Enhanced in v1.2.0)
 
-### 🔐 Data Protection
+### ðŸ” Data Protection
 - **Android Keystore Encryption**: AES/GCM 256-bit encryption for sensitive data
 - **Encrypted Database**: All user data encrypted at rest
 - **Secure Key Management**: Keys stored in hardware-backed Android Keystore
 - **Input Validation**: SQL injection and XSS prevention on all user inputs
 
-### 🛡️ Rate Limiting & Abuse Prevention
+### ðŸ›¡ï¸ Rate Limiting & Abuse Prevention
 - **SMS Rate Limiting**: 
   - 30 messages per hour
   - 100 messages per day
@@ -223,7 +244,7 @@ Model specifications:
 - **Token Bucket Algorithm**: Fair and flexible rate limiting
 - **Automatic Cooldown**: Prevents spam abuse
 
-### 🔒 Privacy Guarantees
+### ðŸ”’ Privacy Guarantees
 - **100% On-Device Processing**: No data leaves your phone
 - **No Network Access**: Core filtering works offline
 - **No Telemetry**: Zero tracking or analytics
@@ -238,19 +259,19 @@ Model specifications:
 
 ## Code Quality (v1.2.0 Improvements)
 
-### 📝 Documentation
+### ðŸ“ Documentation
 - **100% Public API Coverage**: Every public class and method documented
 - **KDoc Standards**: Proper parameter, return, and exception documentation
 - **Code Comments**: Complex logic explained inline
 - **Architecture Docs**: Clear separation of concerns documented
 
-### 🎯 Error Handling
+### ðŸŽ¯ Error Handling
 - **Result Type Pattern**: Consistent error handling across all layers
 - **Custom Exception Hierarchy**: AppException with user-friendly messages
 - **Graceful Degradation**: App continues working even with partial failures
 - **Comprehensive Logging**: Debug information without exposing sensitive data
 
-### ✅ Testing & Validation
+### âœ… Testing & Validation
 - **Input Validation**: All user inputs sanitized and validated
 - **Null Safety**: Kotlin null-safety enforced throughout
 - **Thread Safety**: Proper synchronization for concurrent operations
@@ -258,43 +279,43 @@ Model specifications:
 
 ## Known Issues
 
-- None currently documented. All critical issues fixed in v1.2.0. See [CHANGELOG.md](CHANGELOG.md) for details.
+- None currently documented. All critical issues fixed in v1.2.0. See [CHANGELOG.md](android/CHANGELOG.md) for details.
 
-## 🔮 Future Roadmap
+## ðŸ”® Future Roadmap
 
 ### Version 1.3.0 (Planned)
-- **🤖 TensorFlow Lite Integration**: On-device ML model for smarter classification
-- **🎐 Widget Support**: Quick stats and actions from home screen
-- **🌍 Multi-Language**: Support for 10+ languages
-- **📤 Backup & Restore**: Export/import settings and rules
+- **ðŸ¤– TensorFlow Lite Integration**: On-device ML model for smarter classification
+- **ðŸŽ Widget Support**: Quick stats and actions from home screen
+- **ðŸŒ Multi-Language**: Support for 10+ languages
+- **ðŸ“¤ Backup & Restore**: Export/import settings and rules
 
 ### Version 1.4.0 (Planned)
-- **🎨 Theme Customization**: Custom colors and themes
-- **📊 Analytics Dashboard**: Message statistics and trends
-- **🤝 Contact Integration**: Better contact syncing
-- **⚙️ Advanced Rules**: Custom filter rules creation
+- **ðŸŽ¨ Theme Customization**: Custom colors and themes
+- **ðŸ“Š Analytics Dashboard**: Message statistics and trends
+- **ðŸ¤ Contact Integration**: Better contact syncing
+- **âš™ï¸ Advanced Rules**: Custom filter rules creation
 
 ### Long-term Vision
-- **🌐 Cross-Platform**: iOS and Web versions
-- **🤖 Advanced AI**: GPT-based classification
-- **🔗 API Support**: Developer API for integrations
-- **🌟 Premium Features**: Advanced filtering options
+- **ðŸŒ Cross-Platform**: iOS and Web versions
+- **ðŸ¤– Advanced AI**: GPT-based classification
+- **ðŸ”— API Support**: Developer API for integrations
+- **ðŸŒŸ Premium Features**: Advanced filtering options
 
 ---
 
-## 📚 Resources
+## ðŸ“š Resources
 
-- [Changelog](CHANGELOG.md) - Detailed version history
-- [Contributing](CONTRIBUTING.md) - How to contribute
+- [Changelog](android/CHANGELOG.md) - Detailed version history
+- [Contributing](android/CONTRIBUTING.md) - How to contribute
 - [License](LICENSE) - MIT License
 - [Issues](https://github.com/aryarajsingh/smart-sms-filter/issues) - Report bugs or request features
 
-## 👥 Author
+## ðŸ‘¥ Author
 
 **Aryaraj Singh**
 - GitHub: [@aryarajsingh](https://github.com/aryarajsingh)
 
-## 🙏 Acknowledgments
+## ðŸ™ Acknowledgments
 
 - Android Jetpack team for excellent libraries
 - TensorFlow team for TFLite
@@ -303,5 +324,6 @@ Model specifications:
 ---
 
 <p align="center">
-  Made with ❤️ for Android users who value privacy
+  Made with â¤ï¸ for Android users who value privacy
 </p>
+
