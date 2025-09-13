@@ -14,6 +14,7 @@ import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.material3.*
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Settings
+import androidx.compose.material.icons.filled.Star
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -31,6 +32,7 @@ import com.smartsmsfilter.ui.state.MessageTab
 import com.smartsmsfilter.ui.state.isLoading
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.launch
+// Pull-to-refresh removed - auto-sync is always active
 
 /**
  * Unified message screen component that provides consistent UI, selection, and functionality
@@ -45,6 +47,7 @@ fun UnifiedMessageScreen(
     viewModel: SmsViewModel,
     tab: MessageTab,
     onNavigateToThread: (String) -> Unit,
+    onNavigateToStarred: () -> Unit = {},
     screenTitle: String,
     emptyStateTitle: String,
     emptyStateMessage: String,
@@ -54,7 +57,8 @@ fun UnifiedMessageScreen(
     onSettingsClick: (() -> Unit)? = null,
     groupBySender: Boolean = false, // Kept for flexibility, though logic moved
     unreadCount: Int? = null,
-    totalCount: Int? = null
+    totalCount: Int? = null,
+    showStarredAccess: Boolean = false
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     val mainLoadingState by viewModel.mainLoadingState.collectAsStateWithLifecycle()
@@ -65,6 +69,15 @@ fun UnifiedMessageScreen(
     var whyCategory by remember { mutableStateOf<MessageCategory?>(null) }
     var whyMessageId by remember { mutableStateOf<Long?>(null) }
     var selectedReasons by remember { mutableStateOf(setOf<String>()) }
+    
+    // Optimize expensive calculations
+    val countText = remember(totalCount, unreadCount) {
+        when {
+            totalCount != null -> if (totalCount > 0) "$totalCount spam message${if (totalCount != 1) "s" else ""}" else null
+            unreadCount != null -> if (unreadCount > 0) "$unreadCount unread" else null
+            else -> null
+        }
+    }
     
     // Selection state - now tab-specific
     val tabSelectionState by viewModel.selectionState.getTabState(tab).collectAsStateWithLifecycle()
@@ -85,15 +98,27 @@ fun UnifiedMessageScreen(
         MessageActionBar(
             visible = isSelectionMode,
             selectedCount = selectedCount,
+            currentTab = tab,
+            onMoveToInboxClick = { 
+                viewModel.moveSelectedToCategory(tab, MessageCategory.INBOX)
+                // Trigger learning when moving to inbox
+                if (tab == MessageTab.SPAM || tab == MessageTab.REVIEW) {
+                    selectedMessages.forEach { messageId ->
+                        viewModel.learnFromUserAction(messageId, MessageCategory.INBOX)
+                    }
+                }
+            },
             onMoveToSpamClick = { 
                 viewModel.moveSelectedToCategory(tab, MessageCategory.SPAM)
+                // Trigger learning when marking as spam
+                if (tab == MessageTab.REVIEW) {
+                    selectedMessages.forEach { messageId ->
+                        viewModel.learnFromUserAction(messageId, MessageCategory.SPAM)
+                    }
+                }
             },
             onDeleteClick = { showDeleteDialog = true },
-            onClearSelection = { viewModel.clearSelection(tab) },
-            onMoveToImportantClick = if (tab == MessageTab.REVIEW) {
-                { viewModel.moveSelectedToCategory(tab, MessageCategory.INBOX) }
-            } else null,
-            showMoveToImportant = tab == MessageTab.REVIEW
+            onClearSelection = { viewModel.clearSelection(tab) }
         )
         
         // Premium iOS-style header - consistent across all screens
@@ -121,6 +146,15 @@ fun UnifiedMessageScreen(
                         color = MaterialTheme.colorScheme.onBackground,
                         modifier = Modifier.weight(1f)
                     )
+                    if (showStarredAccess && !isSelectionMode) {
+                        IconButton(onClick = onNavigateToStarred) {
+                            Icon(
+                                imageVector = androidx.compose.material.icons.Icons.Filled.Star,
+                                contentDescription = "Starred Messages",
+                                tint = MaterialTheme.colorScheme.primary
+                            )
+                        }
+                    }
                     if (onSettingsClick != null) {
                         IconButton(onClick = onSettingsClick) {
                             Icon(
@@ -133,11 +167,6 @@ fun UnifiedMessageScreen(
                 }
                 
                 // Message count with appropriate color per screen
-                val countText = when {
-                    totalCount != null -> if (totalCount > 0) "$totalCount spam message${if (totalCount != 1) "s" else ""}" else null
-                    unreadCount != null -> if (unreadCount > 0) "$unreadCount unread" else null
-                    else -> null
-                }
                 if (countText != null) {
                     Text(
                         text = countText,
@@ -198,6 +227,11 @@ fun UnifiedMessageScreen(
         } else {
             // Unified message list with consistent behavior
             val listToShow = messages // Data is now pre-processed
+            
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+            ) {
             LazyColumn(
                 modifier = Modifier.fillMaxSize(),
                 contentPadding = PaddingValues(
@@ -211,12 +245,7 @@ fun UnifiedMessageScreen(
                     key = { it.id },
                     contentType = { "message" } // Help compose optimize
                 ) { message ->
-                    AnimatedVisibility(
-                        visible = true,
-                        enter = fadeIn(animationSpec = tween(120)) + scaleIn(initialScale = 0.98f, animationSpec = tween(120)),
-                        exit = fadeOut(animationSpec = tween(100))
-                    ) {
-                        SwipeableMessageCard(
+                    SwipeableMessageCard(
                             message = message,
                             modifier = Modifier,
                         onClick = {
@@ -248,8 +277,9 @@ fun UnifiedMessageScreen(
                             }
                         }
                         )
-                    }
                 }
+            }
+                // Pull-to-refresh removed - messages auto-sync in real-time
             }
         }
     }

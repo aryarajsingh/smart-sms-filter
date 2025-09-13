@@ -1,0 +1,47 @@
+{
+  "model_type": "Enhanced Synthetic Dense Network",
+  "categories": [
+    "INBOX",
+    "SPAM",
+    "OTP",
+    "BANKING",
+    "ECOMMERCE",
+    "NEEDS_REVIEW"
+  ],
+  "max_words": 7000,
+  "max_len": 80,
+  "test_accuracy": 0.7208333611488342,
+  "sample_test_accuracy": 0.7,
+  "model_size_mb": 3.713409423828125,
+  "training_samples": 1200,
+  "samples_per_category": 200,
+  "architecture": "Embedding(128) + GlobalAveragePooling1D + 4x Dense layers (256,128,64,32)",
+  "features": [
+    "enhanced_synthetic_data",
+    "larger_vocabulary_7000",
+    "longer_sequences_80",
+    "larger_architecture",
+    "balanced_dataset",
+    "class_weights",
+    "early_stopping",
+    "learning_rate_scheduling",
+    "model_checkpointing",
+    "dynamic_batch_size"
+  ],
+  "training_improvements": [
+    "200_samples_per_category",
+    "diverse_message_patterns",
+    "modern_app_notifications",
+    "regional_language_hints",
+    "edge_cases_coverage",
+    "ambiguous_message_handling"
+  ],
+  "class_weights": {
+    "0": 1.0,
+    "1": 1.0,
+    "2": 1.0,
+    "3": 1.0,
+    "4": 1.0,
+    "5": 1.0
+  }
+}

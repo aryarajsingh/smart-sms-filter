@@ -87,6 +87,8 @@ object IOSSpacing {
     val XLarge = PremiumSpacing.XLarge
     
     // Lowercase versions for component compatibility
+    @get:JvmName("getExtraSmallLowercase")
+    val extraSmall = PremiumSpacing.XSmall
     @get:JvmName("getSmallLowercase")
     val small = PremiumSpacing.Small
     @get:JvmName("getMediumLowercase")

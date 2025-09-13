@@ -1,0 +1,47 @@
+{
+  "model_type": "Perfected Enhanced Dense Network",
+  "categories": [
+    "INBOX",
+    "SPAM",
+    "OTP",
+    "BANKING",
+    "ECOMMERCE",
+    "NEEDS_REVIEW"
+  ],
+  "max_words": 5000,
+  "max_len": 60,
+  "test_accuracy": 0.9833333492279053,
+  "sample_test_accuracy": 1.0,
+  "model_size_mb": 1.2960624694824219,
+  "training_samples": 1200,
+  "samples_per_category": 200,
+  "architecture": "Embedding(64) + GlobalAveragePooling1D + 3x Dense layers (128,64,32)",
+  "features": [
+    "high_quality_synthetic_data",
+    "optimal_vocabulary_5000",
+    "optimal_sequences_60",
+    "optimal_architecture_from_fixed",
+    "enhanced_data_diversity",
+    "balanced_dataset",
+    "class_weights",
+    "early_stopping",
+    "learning_rate_scheduling",
+    "model_checkpointing",
+    "dynamic_batch_size"
+  ],
+  "improvements": [
+    "200_samples_per_category",
+    "cleaner_distinctive_patterns",
+    "focused_realistic_templates",
+    "optimal_hyperparameters",
+    "best_of_both_approaches"
+  ],
+  "class_weights": {
+    "0": 1.0,
+    "1": 1.0,
+    "2": 1.0,
+    "3": 1.0,
+    "4": 1.0,
+    "5": 1.0
+  }
+}

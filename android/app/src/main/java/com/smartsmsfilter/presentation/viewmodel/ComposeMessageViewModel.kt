@@ -26,11 +26,12 @@ class ComposeMessageViewModel @Inject constructor(
     private val _uiState = MutableStateFlow(ComposeMessageUiState())
     val uiState: StateFlow<ComposeMessageUiState> = _uiState.asStateFlow()
     
-    // Contact search results
+    // Contact search results - optimized for performance
     val filteredContacts = _uiState
         .map { it.recipientQuery }
         .debounce(300) // Wait 300ms after user stops typing
         .distinctUntilChanged()
+        .filter { it.length >= 2 || it.isBlank() } // Only search with 2+ chars to reduce queries
         .flatMapLatest { query ->
             if (query.isBlank()) {
                 flowOf(emptyList())

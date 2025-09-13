@@ -31,10 +31,31 @@ fun formatRelativeTime(timestamp: Long): String {
 /** Normalizes a phone number for lookup/storage by stripping spaces, dashes, parentheses; keeps leading +. */
 fun normalizePhoneNumber(raw: String?): String {
     if (raw.isNullOrBlank()) return ""
+    
     // Keep leading + and digits only
     val cleaned = raw.trim().replace(Regex("[^+0-9]"), "")
-    // Avoid leading zeros like 0091... (keep as-is if user has it); callers can further standardize if needed
-    return cleaned
+    
+    // If it's a shortcode (less than 7 digits), return as-is
+    val digitsOnly = cleaned.filter { it.isDigit() }
+    if (digitsOnly.length < 7) return cleaned
+    
+    // For Indian numbers, normalize to consistent format
+    // Remove country code variations: +91, 91, 0091
+    val normalized = when {
+        cleaned.startsWith("+91") && cleaned.length >= 12 -> cleaned.substring(3) // +91XXXXXXXXXX -> XXXXXXXXXX
+        cleaned.startsWith("91") && cleaned.length >= 12 -> cleaned.substring(2)  // 91XXXXXXXXXX -> XXXXXXXXXX
+        cleaned.startsWith("0091") && cleaned.length >= 14 -> cleaned.substring(4) // 0091XXXXXXXXXX -> XXXXXXXXXX
+        cleaned.startsWith("0") && cleaned.length == 11 -> cleaned.substring(1)   // 0XXXXXXXXXX -> XXXXXXXXXX
+        else -> cleaned
+    }
+    
+    // Get last 10 digits for Indian mobile numbers
+    val finalDigits = normalized.filter { it.isDigit() }
+    return if (finalDigits.length >= 10) {
+        finalDigits.takeLast(10) // Always use last 10 digits for consistency
+    } else {
+        normalized
+    }
 }
 
 /**
@@ -59,6 +80,7 @@ fun resolveDisplayName(context: Context, address: String?): String {
     if (cached != null) return cached
 
     fun queryPhoneLookup(value: String): String? {
+        if (value.isBlank()) return null
         return try {
             val uri = Uri.withAppendedPath(ContactsContract.PhoneLookup.CONTENT_FILTER_URI, Uri.encode(value))
             context.contentResolver.query(uri, arrayOf(ContactsContract.PhoneLookup.DISPLAY_NAME), null, null, null)?.use { c ->

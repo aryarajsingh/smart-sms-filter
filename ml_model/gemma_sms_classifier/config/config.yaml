@@ -1,0 +1,58 @@
+# Gemma SMS Classifier Configuration
+
+# Model Configuration
+model:
+  name: "google/gemma-2b-it"  # Using the instruction-tuned version
+  max_length: 512
+  temperature: 0.1
+  do_sample: false
+  device: "cpu"  # Will auto-detect CUDA if available
+  load_in_8bit: false  # Set to true if you have limited memory
+  load_in_4bit: false  # Set to true for even more memory savings
+
+# SMS Classification Settings
+classification:
+  categories:
+    - "INBOX"      # Important personal/business messages
+    - "SPAM"       # Promotional/unwanted messages  
+    - "NEEDS_REVIEW"  # Uncertain messages requiring manual review
+  
+  # Confidence thresholds
+  confidence_threshold: 0.7
+  review_threshold: 0.5  # Below this goes to NEEDS_REVIEW
+
+# Training Configuration (for fine-tuning)
+training:
+  learning_rate: 5e-5
+  batch_size: 4
+  gradient_accumulation_steps: 4
+  epochs: 3
+  warmup_steps: 100
+  weight_decay: 0.01
+  logging_steps: 10
+  save_steps: 500
+  
+# Data Configuration
+data:
+  max_samples: 1000  # Maximum training samples to use
+  validation_split: 0.2
+  test_split: 0.1
+  
+# API Configuration
+api:
+  host: "0.0.0.0"
+  port: 8000
+  workers: 1
+  
+# Logging
+logging:
+  level: "INFO"
+  format: "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
+  file: "logs/gemma_sms_classifier.log"
+
+# Paths
+paths:
+  base_model_cache: "./models/base"
+  fine_tuned_model: "./models/fine_tuned"
+  training_data: "./data/training"
+  inference_cache: "./models/inference_cache"

@@ -24,111 +24,166 @@ import com.smartsmsfilter.ui.theme.IOSSpacing
 fun MessageActionBar(
     visible: Boolean,
     selectedCount: Int,
+    currentTab: com.smartsmsfilter.ui.state.MessageTab,
+    onMoveToInboxClick: () -> Unit,
     onMoveToSpamClick: () -> Unit,
     onDeleteClick: () -> Unit,
     onClearSelection: () -> Unit,
-    modifier: Modifier = Modifier,
-    onMoveToImportantClick: (() -> Unit)? = null,
-    showMoveToImportant: Boolean = false
+    modifier: Modifier = Modifier
 ) {
     AnimatedVisibility(
         visible = visible,
-        enter = slideInVertically(initialOffsetY = { it }),
-        exit = slideOutVertically(targetOffsetY = { it }),
+        enter = slideInVertically(initialOffsetY = { -it }),
+        exit = slideOutVertically(targetOffsetY = { -it }),
         modifier = modifier
     ) {
-        Card(
+        Surface(
             modifier = Modifier
-                .fillMaxWidth()
-                .padding(IOSSpacing.medium),
-            shape = RoundedCornerShape(16.dp),
-            colors = CardDefaults.cardColors(
-                containerColor = MaterialTheme.colorScheme.surfaceVariant
-            ),
-            elevation = CardDefaults.cardElevation(defaultElevation = 8.dp)
+                .fillMaxWidth(),
+            color = MaterialTheme.colorScheme.primaryContainer,
+            shadowElevation = 8.dp
         ) {
-            Row(
+            Column(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(IOSSpacing.medium),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
+                    .padding(horizontal = IOSSpacing.medium, vertical = IOSSpacing.small)
             ) {
-                // Selection count and clear button
+                // Top row with count and close button
                 Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(IOSSpacing.small)
-                ) {
-                    IconButton(onClick = onClearSelection) {
-                        Icon(
-                            imageVector = Icons.Default.Close,
-                            contentDescription = "Clear selection",
-                            tint = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-                    }
-                    Text(
-                        text = "$selectedCount selected",
-                        style = MaterialTheme.typography.titleMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                }
-                
-                // Action buttons
-                Row(
-                    horizontalArrangement = Arrangement.spacedBy(IOSSpacing.small),
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    // Move to Important button (Review screen only)
-                    if (showMoveToImportant && onMoveToImportantClick != null) {
-                        FilledTonalButton(
-                            onClick = onMoveToImportantClick,
-                            colors = ButtonDefaults.filledTonalButtonColors(
-                                containerColor = MaterialTheme.colorScheme.primaryContainer,
-                                contentColor = MaterialTheme.colorScheme.onPrimaryContainer
-                            )
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(IOSSpacing.extraSmall)
+                    ) {
+                        IconButton(
+                            onClick = onClearSelection,
+                            modifier = Modifier.size(40.dp)
                         ) {
                             Icon(
-                                imageVector = Icons.Default.CheckCircle,
-                                contentDescription = null,
-                                modifier = Modifier.size(16.dp)
+                                imageVector = Icons.Default.Close,
+                                contentDescription = "Clear selection",
+                                tint = MaterialTheme.colorScheme.onPrimaryContainer
                             )
-                            Spacer(modifier = Modifier.width(4.dp))
-                            Text("Important", style = MaterialTheme.typography.labelMedium)
+                        }
+                        Text(
+                            text = "$selectedCount selected",
+                            style = MaterialTheme.typography.titleMedium,
+                            color = MaterialTheme.colorScheme.onPrimaryContainer
+                        )
+                    }
+                }
+                
+                // Action buttons row - show different buttons based on current tab
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(top = IOSSpacing.extraSmall),
+                    horizontalArrangement = Arrangement.End,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    when (currentTab) {
+                        com.smartsmsfilter.ui.state.MessageTab.INBOX -> {
+                            // Inbox: Move to Spam, Delete
+                            TextButton(
+                                onClick = onMoveToSpamClick,
+                                modifier = Modifier.padding(horizontal = 4.dp)
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.Block,
+                                    contentDescription = null,
+                                    modifier = Modifier.size(18.dp),
+                                    tint = MaterialTheme.colorScheme.error
+                                )
+                                Spacer(modifier = Modifier.width(4.dp))
+                                Text(
+                                    "Spam",
+                                    style = MaterialTheme.typography.labelLarge,
+                                    color = MaterialTheme.colorScheme.error
+                                )
+                            }
+                        }
+                        
+                        com.smartsmsfilter.ui.state.MessageTab.SPAM -> {
+                            // Spam: Move to Inbox, Delete
+                            TextButton(
+                                onClick = onMoveToInboxClick,
+                                modifier = Modifier.padding(horizontal = 4.dp)
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.CheckCircle,
+                                    contentDescription = null,
+                                    modifier = Modifier.size(18.dp),
+                                    tint = MaterialTheme.colorScheme.primary
+                                )
+                                Spacer(modifier = Modifier.width(4.dp))
+                                Text(
+                                    "Move to Inbox",
+                                    style = MaterialTheme.typography.labelLarge,
+                                    color = MaterialTheme.colorScheme.primary
+                                )
+                            }
+                        }
+                        
+                        com.smartsmsfilter.ui.state.MessageTab.REVIEW -> {
+                            // Review: Move to Inbox, Mark as Spam, Delete
+                            TextButton(
+                                onClick = onMoveToInboxClick,
+                                modifier = Modifier.padding(horizontal = 4.dp)
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.CheckCircle,
+                                    contentDescription = null,
+                                    modifier = Modifier.size(18.dp),
+                                    tint = MaterialTheme.colorScheme.primary
+                                )
+                                Spacer(modifier = Modifier.width(4.dp))
+                                Text(
+                                    "Inbox",
+                                    style = MaterialTheme.typography.labelLarge,
+                                    color = MaterialTheme.colorScheme.primary
+                                )
+                            }
+                            
+                            TextButton(
+                                onClick = onMoveToSpamClick,
+                                modifier = Modifier.padding(horizontal = 4.dp)
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.Block,
+                                    contentDescription = null,
+                                    modifier = Modifier.size(18.dp),
+                                    tint = MaterialTheme.colorScheme.error
+                                )
+                                Spacer(modifier = Modifier.width(4.dp))
+                                Text(
+                                    "Spam",
+                                    style = MaterialTheme.typography.labelLarge,
+                                    color = MaterialTheme.colorScheme.error
+                                )
+                            }
                         }
                     }
                     
-                    // Move to Spam button
-                    FilledTonalButton(
-                        onClick = onMoveToSpamClick,
-                        colors = ButtonDefaults.filledTonalButtonColors(
-                            containerColor = MaterialTheme.colorScheme.errorContainer,
-                            contentColor = MaterialTheme.colorScheme.onErrorContainer
-                        )
-                    ) {
-                        Icon(
-                            imageVector = Icons.Default.Block,
-                            contentDescription = null,
-                            modifier = Modifier.size(16.dp)
-                        )
-                        Spacer(modifier = Modifier.width(4.dp))
-                        Text("Spam", style = MaterialTheme.typography.labelMedium)
-                    }
-                    
-                    // Delete button
-                    FilledTonalButton(
+                    // Delete button - always shown
+                    TextButton(
                         onClick = onDeleteClick,
-                        colors = ButtonDefaults.filledTonalButtonColors(
-                            containerColor = MaterialTheme.colorScheme.error,
-                            contentColor = MaterialTheme.colorScheme.onError
-                        )
+                        modifier = Modifier.padding(horizontal = 4.dp)
                     ) {
                         Icon(
                             imageVector = Icons.Default.Delete,
                             contentDescription = null,
-                            modifier = Modifier.size(16.dp)
+                            modifier = Modifier.size(18.dp),
+                            tint = MaterialTheme.colorScheme.error
                         )
                         Spacer(modifier = Modifier.width(4.dp))
-                        Text("Delete", style = MaterialTheme.typography.labelMedium)
+                        Text(
+                            "Delete",
+                            style = MaterialTheme.typography.labelLarge,
+                            color = MaterialTheme.colorScheme.error
+                        )
                     }
                 }
             }

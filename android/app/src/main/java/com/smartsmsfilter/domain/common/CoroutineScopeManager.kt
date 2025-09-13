@@ -22,8 +22,7 @@ class CoroutineScopeManager @Inject constructor() {
      */
     val backgroundScope = CoroutineScope(
         SupervisorJob() + Dispatchers.IO + CoroutineExceptionHandler { _, exception ->
-            // Log exception but don't crash the app
-            android.util.Log.e("CoroutineScope", "Unhandled exception in background scope", exception)
+            // Handle exception but don't crash the app - silently continue
         }
     )
     
@@ -32,7 +31,7 @@ class CoroutineScopeManager @Inject constructor() {
      */
     val uiScope = CoroutineScope(
         SupervisorJob() + Dispatchers.Main + CoroutineExceptionHandler { _, exception ->
-            android.util.Log.e("CoroutineScope", "Unhandled exception in UI scope", exception)
+            // Handle exception but don't crash the app - silently continue
         }
     )
     
@@ -43,7 +42,6 @@ class CoroutineScopeManager @Inject constructor() {
         flowBuilder: suspend FlowCollector<T>.() -> Unit
     ): Flow<T> = kotlinx.coroutines.flow.flow(flowBuilder)
         .catch { e ->
-            android.util.Log.e("SafeFlow", "Exception in flow", e)
             emit(Result.Error(AppException.from(e)) as T)
         }
         .flowOn(Dispatchers.IO)
@@ -79,7 +77,7 @@ class CoroutineScopeManager @Inject constructor() {
             // Re-throw cancellation exceptions
             throw e
         } catch (e: Exception) {
-            android.util.Log.e("SafeLaunch", "Exception in coroutine", e)
+            // Handle exception silently
         }
     }
     

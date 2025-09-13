@@ -88,7 +88,7 @@ class SmsReceiver : BroadcastReceiver() {
 
                 // Process each message with proper error handling
                 messages.forEach { smsMessage ->
-                    processSmsMessageSafely(smsMessage)
+                    processSmsMessageSafely(smsMessage, context)
                 }
 
                 if (!isDefaultSmsApp) {
@@ -101,7 +101,7 @@ class SmsReceiver : BroadcastReceiver() {
         }
     }
     
-    private fun processSmsMessageSafely(smsMessage: SmsMessage) {
+    private fun processSmsMessageSafely(smsMessage: SmsMessage, context: Context? = null) {
         // Use a controlled scope that will be cancelled properly
         scopeManager.launchSafely {
             try {
@@ -135,18 +135,25 @@ class SmsReceiver : BroadcastReceiver() {
                     timestamp = timestamp,
                     category = com.smartsmsfilter.domain.model.MessageCategory.NEEDS_REVIEW,
                     isRead = false,
+                    threadId = normalizedSender, // Set threadId for consistency with outgoing messages
                     isOutgoing = false
                 )
 
                 // Classify and store via service (handles DB write)
                 val classification = classificationService.classifyAndStore(provisionalMessage)
                 Log.d(TAG, "Message classified as: ${classification.category} (conf=${classification.confidence})")
+                
+                // Get the final message with ID from database to ensure it was stored
+                val finalMessage = provisionalMessage.copy(
+                    category = classification.category,
+                    id = classification.messageId ?: 0L
+                )
 
                 // Notify user based on final category
-                notificationManager.showSmartNotification(
-                    provisionalMessage.copy(category = classification.category)
-                )
+                notificationManager.showSmartNotification(finalMessage)
                 Log.d(TAG, "Notification sent for category: ${classification.category}")
+                
+                // Note: UI refresh is handled by reactive Flows, no broadcast needed
                 
             } catch (e: Exception) {
                 Log.e(TAG, "Unexpected error processing SMS", e)

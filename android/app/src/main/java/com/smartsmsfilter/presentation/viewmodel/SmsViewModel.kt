@@ -24,10 +24,24 @@ import com.smartsmsfilter.ui.state.executeOperation
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.async
+import kotlinx.coroutines.awaitAll
+import kotlinx.coroutines.delay
 import javax.inject.Inject
+import android.content.BroadcastReceiver
+import android.content.Context
+import android.content.Intent
+import android.content.IntentFilter
+import android.database.ContentObserver
+import android.net.Uri
+import android.os.Handler
+import android.os.Looper
+import android.provider.Telephony
 
 @HiltViewModel
 class SmsViewModel @Inject constructor(
+    @dagger.hilt.android.qualifiers.ApplicationContext private val context: Context,
     private val getAllMessagesUseCase: GetAllMessagesUseCase,
     private val getMessagesByCategoryUseCase: GetMessagesByCategoryUseCase,
     private val updateMessageCategoryUseCase: UpdateMessageCategoryUseCase,
@@ -55,48 +69,120 @@ class SmsViewModel @Inject constructor(
     // Selection State
     val selectionState = MessageSelectionState()
     
-    // Private flows for raw message data
+    // Private flows for raw message data - optimized with sharing to avoid multiple queries
     private val inboxMessages = getMessagesByCategoryUseCase(MessageCategory.INBOX)
+        .shareIn(viewModelScope, SharingStarted.WhileSubscribed(5000), replay = 1)
     private val spamMessages = getMessagesByCategoryUseCase(MessageCategory.SPAM)
+        .shareIn(viewModelScope, SharingStarted.WhileSubscribed(5000), replay = 1)
     private val reviewMessages = getMessagesByCategoryUseCase(MessageCategory.NEEDS_REVIEW)
+        .shareIn(viewModelScope, SharingStarted.WhileSubscribed(5000), replay = 1)
+    
+    // Broadcast receiver for real-time message updates (removed - relying on reactive Flows)
 
     init {
-        // Load existing SMS messages from device on first launch
-        loadExistingSmsMessages()
+        // Register ContentObserver for SMS provider changes (for background updates)
+        registerSmsContentObserver()
+        
+        // Load ALL messages immediately on startup
+        loadAllMessagesImmediately()
 
-        // Combine raw data streams and transform them into UI state
-        viewModelScope.launch {
-            combine(
-                inboxMessages, 
-                spamMessages, 
-                reviewMessages
-            ) { inbox, spam, review ->
-                // Group conversations for the inbox view
-                val inboxConversations = inbox
-                    .groupBy { com.smartsmsfilter.ui.utils.normalizePhoneNumber(it.sender) }
-                    .values
-                    .mapNotNull { group -> group.maxByOrNull { m -> m.timestamp } }
-                    .sortedByDescending { it.timestamp }
+        // Combine raw data streams and transform them into UI state - optimized flow operators
+        combine(
+            inboxMessages, 
+            spamMessages, 
+            reviewMessages
+        ) { inbox, spam, review ->
+                // Group inbox messages by sender to show as conversation threads
+                // Each thread shows the latest message but contains all messages internally
+                val inboxThreads = inbox
+                    .groupBy {
+                        com.smartsmsfilter.ui.utils.normalizePhoneNumber(it.sender)
+                    }
+                    .map { (sender, messages) ->
+                        // Get the latest INBOX message from this sender to display in the list
+                        val latestInboxMessage = messages.maxByOrNull { it.timestamp }
+                        // Mark thread as unread if ANY inbox message is unread (fast heuristic)
+                        val hasUnread = messages.any { !it.isRead }
+                        latestInboxMessage?.copy(
+                            isRead = !hasUnread,
+                            content = latestInboxMessage.content
+                        ) to sender
+                    }
+                    .filter { it.first != null }
+                    .map { it.first!! to it.second }
+                    // Sort by latest inbox activity (most recent message from sender)
+                    .sortedByDescending { (message, _) ->
+                        message.timestamp
+                    }
+                    .map { it.first }
 
+                // Spam and Review show all individual messages (not grouped)
+                val spamSorted = spam.sortedByDescending { it.timestamp }
+                val reviewSorted = review.sortedByDescending { it.timestamp }
+                
                 // Update the single UI state object
                 _uiState.update {
                     it.copy(
-                        inboxMessages = inboxConversations,
-                        spamMessages = spam,
-                        reviewMessages = review,
+                        inboxMessages = inboxThreads,
+                        spamMessages = spamSorted,
+                        reviewMessages = reviewSorted,
+                        inboxUnreadCount = inbox.count { !it.isRead }, // Total unread messages
+                        spamTotalCount = spam.size,
+                        reviewUnreadCount = review.count { !it.isRead },
+                        isLoading = false
+                    )
+                }
+            }
+            .flowOn(kotlinx.coroutines.Dispatchers.Default) // Move processing to background thread
+            .launchIn(viewModelScope) // Use launchIn instead of collect() for better cancellation
+    }
+    
+    private fun refreshMessageCounts() {
+        // Force a refresh by manually collecting the current state from all flows
+        viewModelScope.launch {
+            try {
+                val inbox = inboxMessages.first()
+                val spam = spamMessages.first()
+                val review = reviewMessages.first()
+
+                // Group inbox messages by sender to show as conversation threads
+                val inboxThreads = inbox
+                    .groupBy {
+                        val normalized = com.smartsmsfilter.ui.utils.normalizePhoneNumber(it.sender)
+                        normalized
+                    }
+                    .map { (sender, messages) ->
+                        val latestInboxMessage = messages.maxByOrNull { it.timestamp }
+                        val hasUnread = messages.any { !it.isRead }
+                        latestInboxMessage?.copy(
+                            isRead = !hasUnread,
+                            content = latestInboxMessage.content
+                        ) to sender
+                    }
+                    .filter { it.first != null }
+                    .map { it.first!! to it.second }
+                    .sortedByDescending { (message, _) -> message.timestamp }
+                    .map { it.first }
+
+                // Spam and Review show all individual messages (not grouped)
+                val spamSorted = spam.sortedByDescending { it.timestamp }
+                val reviewSorted = review.sortedByDescending { it.timestamp }
+
+                _uiState.update {
+                    it.copy(
+                        inboxMessages = inboxThreads,
+                        spamMessages = spamSorted,
+                        reviewMessages = reviewSorted,
                         inboxUnreadCount = inbox.count { !it.isRead },
                         spamTotalCount = spam.size,
                         reviewUnreadCount = review.count { !it.isRead },
                         isLoading = false
                     )
                 }
-            }.collect()
+            } catch (e: Exception) {
+                _uiState.update { it.copy(isLoading = false) }
+            }
         }
-    }
-    
-    private fun refreshMessageCounts() {
-        // This function is now implicitly handled by the combine flow
-        // but can be kept for explicit refresh if needed elsewhere.
     }
     
     fun updateMessageCategory(messageId: Long, category: MessageCategory) {
@@ -106,9 +192,7 @@ class SmsViewModel @Inject constructor(
                 onSuccess = {
                     // Force refresh of message counts
                     refreshMessageCounts()
-                    _uiState.value = _uiState.value.copy(
-                        message = "Message moved to ${category.name.lowercase()}"
-                    )
+                    showMessage("Message moved to ${category.name.lowercase()}")
                 },
                 onError = { error ->
                     _uiState.value = _uiState.value.copy(
@@ -138,6 +222,19 @@ class SmsViewModel @Inject constructor(
     
     fun clearError() {
         _uiState.value = _uiState.value.copy(error = null)
+    }
+    
+    // Helper function to show message with auto-clear
+    private fun showMessage(message: String) {
+        _uiState.value = _uiState.value.copy(message = message)
+        // Auto-clear message after 4 seconds if not cleared by user action
+        viewModelScope.launch {
+            delay(4000)
+            // Only clear if the message is still the same
+            if (_uiState.value.message == message) {
+                clearMessage()
+            }
+        }
     }
     
     // Retry the action from an error state
@@ -175,9 +272,7 @@ class SmsViewModel @Inject constructor(
                 result?.fold(
                     onSuccess = {
                         selectionState.clearSelection(tab)
-                        _uiState.value = _uiState.value.copy(
-                            message = "${selectedIds.size} message(s) archived"
-                        )
+                        showMessage("${selectedIds.size} message(s) archived")
                     },
                     onError = { error ->
                         _uiState.value = _uiState.value.copy(
@@ -204,9 +299,7 @@ class SmsViewModel @Inject constructor(
                     onSuccess = {
                         lastOperation = LastOperation(OperationType.Delete, selectedIds, null)
                         selectionState.clearSelection(tab)
-                        _uiState.value = _uiState.value.copy(
-                            message = "${selectedIds.size} message(s) deleted"
-                        )
+                        showMessage("${selectedIds.size} message(s) deleted")
                     },
                     onError = { error ->
                         _uiState.value = _uiState.value.copy(
@@ -221,12 +314,9 @@ class SmsViewModel @Inject constructor(
     
     fun moveSelectedToCategory(tab: MessageTab, category: MessageCategory) {
         val selectedIds = selectionState.getSelectedMessageIds(tab)
-        android.util.Log.d("SmsViewModel", "moveSelectedToCategory called: ${selectedIds.size} messages from tab $tab to $category")
-        android.util.Log.d("SmsViewModel", "Selected message IDs: $selectedIds")
         
         if (selectedIds.isNotEmpty()) {
             viewModelScope.launch {
-                android.util.Log.d("SmsViewModel", "Starting batch move operation...")
                 
                 val operationResult = loadingStateManager.executeOperation(
                     key = LoadingStateManager.BULK_OPERATION,
@@ -245,18 +335,13 @@ class SmsViewModel @Inject constructor(
                 operationResult?.let { (result, prevMap) ->
                     result.fold(
                         onSuccess = {
-                            android.util.Log.d("SmsViewModel", "Batch move successful, clearing selection")
                             lastOperation = LastOperation(OperationType.MoveCategory, selectedIds, prevMap)
                             selectionState.clearSelection(tab)
                             // Force refresh of message counts after batch move
                             refreshMessageCounts()
-                            _uiState.value = _uiState.value.copy(
-                                message = "${selectedIds.size} message(s) moved to ${category.name.lowercase()}"
-                            )
-                            android.util.Log.d("SmsViewModel", "Successfully moved ${selectedIds.size} messages to $category")
+                            showMessage("${selectedIds.size} message(s) moved to ${category.name.lowercase()}")
                         },
                         onError = { error ->
-                            android.util.Log.e("SmsViewModel", "Error in batch move operation: ${error.message}", error)
                             _uiState.value = _uiState.value.copy(
                                 error = error.toUiError { moveSelectedToCategory(tab, category) }
                             )
@@ -264,8 +349,6 @@ class SmsViewModel @Inject constructor(
                     )
                 }
             }
-        } else {
-            android.util.Log.w("SmsViewModel", "No messages selected for category move")
         }
     }
     
@@ -274,9 +357,7 @@ class SmsViewModel @Inject constructor(
         viewModelScope.launch {
             try {
                 messageManagementUseCase.archiveMessages(listOf(messageId))
-                _uiState.value = _uiState.value.copy(
-                    message = "Message archived"
-                )
+                showMessage("Message archived")
             } catch (e: Exception) {
                 _uiState.value = _uiState.value.copy(
                     error = e.toUiError { archiveMessage(messageId) }
@@ -289,9 +370,7 @@ class SmsViewModel @Inject constructor(
         viewModelScope.launch {
             try {
                 messageManagementUseCase.deleteMessage(messageId)
-                _uiState.value = _uiState.value.copy(
-                    message = "Message deleted"
-                )
+                showMessage("Message deleted")
             } catch (e: Exception) {
                 _uiState.value = _uiState.value.copy(
                     error = e.toUiError { deleteMessage(messageId) }
@@ -307,13 +386,13 @@ class SmsViewModel @Inject constructor(
             when (op.type) {
                 OperationType.Delete -> {
                     smsRepository.restoreSoftDeletedMessages(op.affectedIds)
-                    _uiState.value = _uiState.value.copy(message = "Restored ${op.affectedIds.size} message(s)")
+                    showMessage("Restored ${op.affectedIds.size} message(s)")
                 }
                 OperationType.MoveCategory -> {
                     op.previousCategories?.forEach { (id, prevCat) ->
                         updateMessageCategoryUseCase(id, prevCat)
                     }
-                    _uiState.value = _uiState.value.copy(message = "Move undone")
+                    showMessage("Move undone")
                 }
             }
             lastOperation = null
@@ -325,9 +404,9 @@ class SmsViewModel @Inject constructor(
         try {
             val reason = smsRepository.getLatestClassificationReason(messageId)
             val display = if (!reason.isNullOrBlank()) "Why: $reason" else "Why information unavailable"
-            _uiState.value = _uiState.value.copy(message = display)
+            showMessage(display)
         } catch (e: Exception) {
-            _uiState.value = _uiState.value.copy(message = "Why information unavailable")
+            showMessage("Why information unavailable")
         }
     }
 
@@ -349,6 +428,27 @@ class SmsViewModel @Inject constructor(
         }
     }
 
+    // Learn from user action when they move messages
+    fun learnFromUserAction(messageId: Long, targetCategory: MessageCategory) {
+        viewModelScope.launch {
+            try {
+                val message = smsRepository.getMessageById(messageId)
+                message?.let { msg ->
+                    // Trigger learning based on the correction
+                    when (targetCategory) {
+                        MessageCategory.INBOX -> senderLearningUseCase.learnFromInboxMove(msg)
+                        MessageCategory.SPAM -> senderLearningUseCase.learnFromSpamMarking(msg)
+                        MessageCategory.NEEDS_REVIEW -> { /* No specific learning for review */ }
+                    }
+                    // Also trigger classification service learning
+                    classificationService.handleUserCorrection(messageId, targetCategory, "User manual correction")
+                }
+            } catch (e: Exception) {
+                android.util.Log.w("SmsViewModel", "Failed to learn from user action", e)
+            }
+        }
+    }
+    
     // User correction from Why? sheet
     fun correctClassification(messageId: Long, targetCategory: MessageCategory, reasons: List<String>) {
         viewModelScope.launch {
@@ -373,10 +473,9 @@ class SmsViewModel @Inject constructor(
                             
                             // 2. Learn content-based patterns via classification service
                             classificationService.handleUserCorrection(messageId, targetCategory, reasons.joinToString(", "))
-                        } catch (e: Exception) {
-                            // Learning failures should not break the UI flow
-                            android.util.Log.w("SmsViewModel", "Failed to learn from user correction", e)
-                        }
+            } catch (e: Exception) {
+                // Learning failures should not break the UI flow
+            }
                     }
                     
                     // Prepare undo
@@ -385,9 +484,7 @@ class SmsViewModel @Inject constructor(
                         affectedIds = listOf(messageId),
                         previousCategories = prev?.let { mapOf(messageId to it) }
                     )
-                    _uiState.value = _uiState.value.copy(
-                        message = "Message moved to ${targetCategory.name.lowercase()}"
-                    )
+                    showMessage("Message moved to ${targetCategory.name.lowercase()}")
                 },
                 onError = { error ->
                     _uiState.value = _uiState.value.copy(
@@ -400,18 +497,87 @@ class SmsViewModel @Inject constructor(
 
     // Public function to reload SMS messages - useful for permission changes or manual refresh
     fun reloadSmsMessages() {
-        loadExistingSmsMessages()
+        loadAllMessagesImmediately()
     }
     
-    private fun loadExistingSmsMessages() {
+    // Get total message count for a sender (for displaying in thread)
+    fun getMessageCountForSender(sender: String): Int {
+        // This would need to be exposed from repository if needed
+        return 0 // Placeholder
+    }
+    
+    // Removed pull-to-refresh - messages auto-sync in real-time
+    
+    private fun loadAllMessagesImmediately() {
         viewModelScope.launch {
-            val result = loadingStateManager.executeMainOperation(
-                operation = LoadingOperation.LOADING_MESSAGES,
-                canCancel = false
-            ) {
-                // Load a comprehensive set of messages on first open to avoid fragmented threads
+            try {
+                _uiState.update { it.copy(isLoading = true) }
+                
+                // Load ALL messages from device
                 smsReader.loadAllSmsMessages().collect { messages ->
-                    // Save messages to database if they don't exist
+                    if (messages.isEmpty()) {
+                        _uiState.update { it.copy(isLoading = false) }
+                        return@collect
+                    }
+                    
+                    // Process messages in batches for better performance
+                    val batchSize = 100
+                    var totalInserted = 0
+                    
+                    messages.chunked(batchSize).forEachIndexed { index, batch ->
+                        val insertedInBatch = coroutineScope {
+                            batch.map { message ->
+                                async {
+                                    try {
+                                        // For initial sync only - check if message already exists
+                                        val existing = smsRepository.getMessageById(message.id)
+                                        if (existing == null) {
+                                            // New message - needs classification
+                                            if (!message.isOutgoing) {
+                                                // Incoming messages should be classified
+                                                val classification = classificationService.classifyAndStore(message)
+                                                if (classification.messageId != null && classification.messageId > 0) {
+                                                    1
+                                                } else {
+                                                    0
+                                                }
+                                            } else {
+                                                // Outgoing messages just insert
+                                                val result = smsRepository.insertMessage(message)
+                                                if (result.isSuccess && result.getOrNull() ?: -1L > 0) {
+                                                    1
+                                                } else {
+                                                    0
+                                                }
+                                            }
+                                        } else {
+                                            0 // Already exists
+                                        }
+                                    } catch (e: Exception) {
+                                        0
+                                    }
+                                }
+                            }.awaitAll().sum()
+                        }
+                        totalInserted += insertedInBatch
+                    }
+                    _uiState.update { it.copy(isLoading = false) }
+                    
+                    // Force immediate UI refresh
+                    refreshMessageCounts()
+                }
+            } catch (e: Exception) {
+                _uiState.update { it.copy(isLoading = false, error = e.toUiError { loadAllMessagesImmediately() }) }
+            }
+        }
+    }
+    
+    // Sync only new messages (for real-time updates)
+    private fun syncNewMessages() {
+        viewModelScope.launch {
+            try {
+                // Load only the most recent 50 messages for quick sync
+                smsReader.loadRecentSmsMessages(50).collect { messages ->
                     messages.forEach { message ->
                         try {
                             smsRepository.insertMessage(message)
@@ -420,14 +586,54 @@ class SmsViewModel @Inject constructor(
                         }
                     }
                 }
+            } catch (e: Exception) {
+                // Silently handle sync errors
+            }
+        }
+    }
+    
+    // ContentObserver for monitoring SMS database changes
+    private var smsContentObserver: ContentObserver? = null
+    
+    private fun registerSmsContentObserver() {
+        try {
+            // Create the observer inline during registration
+            smsContentObserver = object : ContentObserver(Handler(Looper.getMainLooper())) {
+                override fun onChange(selfChange: Boolean, uri: Uri?) {
+                    super.onChange(selfChange, uri)
+                    // Note: Reactive Flows should handle real-time updates automatically
+                    // ContentObserver is kept for background sync if needed
+                }
             }
             
-            if (result == null) {
-                // Handle error case
-                _uiState.value = _uiState.value.copy(
-                    error = Exception("Failed to load messages").toUiError { reloadSmsMessages() }
+            // Register observer for SMS inbox changes
+            smsContentObserver?.let { observer ->
+                context.contentResolver.registerContentObserver(
+                    Uri.parse("content://sms/inbox"),
+                    true,
+                    observer
+                )
+                // Also monitor all SMS changes
+                context.contentResolver.registerContentObserver(
+                    Uri.parse("content://sms"),
+                    false,
+                    observer
                 )
             }
+        } catch (e: Exception) {
+            // Silently handle ContentObserver registration failure
+        }
+    }
+    
+    override fun onCleared() {
+        super.onCleared()
+        // Unregister content observer
+        try {
+            smsContentObserver?.let { observer ->
+                context.contentResolver.unregisterContentObserver(observer)
+            }
+        } catch (e: Exception) {
+            // Ignore if already unregistered
         }
     }
 }

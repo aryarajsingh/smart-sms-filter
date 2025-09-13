@@ -1,0 +1,65 @@
+# Mobile SMS Classifier - Python Dependencies
+# Optimized for smartphone-compatible model training and deployment
+
+# Core ML Framework
+tensorflow>=2.17.0               # TensorFlow with TFLite support
+transformers>=4.30.0,<5.0.0     # HuggingFace Transformers for DistilBERT
+
+# Data Processing
+numpy>=1.24.0,<2.0.0            # Numerical operations
+pandas>=2.0.0,<3.0.0            # Data manipulation
+scikit-learn>=1.3.0,<2.0.0      # ML utilities and metrics
+
+# Text Processing
+tokenizers>=0.13.3,<1.0.0       # Fast tokenization
+nltk>=3.8.0,<4.0.0              # Natural language processing
+textblob>=0.17.0,<1.0.0         # Sentiment analysis
+
+# Configuration and Utilities
+pyyaml>=6.0.0,<7.0.0            # YAML configuration files
+python-dotenv>=1.0.0,<2.0.0     # Environment variables
+pathlib>=1.0.0                  # Path handling (built-in)
+dataclasses                     # Data classes (built-in for Python 3.7+)
+
+# Visualization and Analysis
+matplotlib>=3.7.0,<4.0.0        # Plotting
+seaborn>=0.12.0,<1.0.0          # Statistical visualization
+plotly>=5.15.0,<6.0.0           # Interactive plots
+
+# Performance and Optimization
+psutil>=5.9.0,<6.0.0            # System monitoring
+memory-profiler>=0.60.0,<1.0.0  # Memory usage tracking
+
+# Model Quantization and Optimization
+tensorflow-model-optimization>=0.7.2,<1.0.0  # Model optimization toolkit
+
+# API and Web Framework (for testing server)
+fastapi>=0.100.0,<1.0.0         # Fast API framework
+uvicorn>=0.22.0,<1.0.0          # ASGI server
+pydantic>=2.0.0,<3.0.0          # Data validation
+
+# Testing
+pytest>=7.4.0,<8.0.0            # Testing framework
+pytest-asyncio>=0.21.0,<1.0.0   # Async testing
+pytest-cov>=4.1.0,<5.0.0        # Coverage testing
+
+# Development Tools
+black>=23.0.0,<24.0.0           # Code formatting
+flake8>=6.0.0,<7.0.0            # Linting
+mypy>=1.4.0,<2.0.0              # Type checking
+pre-commit>=3.3.0,<4.0.0        # Git hooks
+
+# Jupyter (for analysis and experimentation)
+jupyter>=1.0.0,<2.0.0           # Jupyter notebook
+ipywidgets>=8.0.0,<9.0.0        # Interactive widgets
+
+# Additional utilities
+tqdm>=4.65.0,<5.0.0             # Progress bars
+colorama>=0.4.6,<1.0.0          # Colored terminal output
+rich>=13.4.0,<14.0.0            # Rich text and beautiful formatting
+
+# Optional: For advanced quantization
+# tensorflow-lite-support>=0.4.4  # TFLite utilities (optional)
+
+# Note: For production Android deployment, only TensorFlow Lite runtime is needed
+# This requirements.txt is for the training/development environment

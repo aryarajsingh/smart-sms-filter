@@ -6,6 +6,7 @@ sealed class NavRoutes(val route: String) {
     object Inbox : NavRoutes("inbox")
     object Spam : NavRoutes("spam")  
     object Review : NavRoutes("review")
+    object StarredMessages : NavRoutes("starred")
     object Settings : NavRoutes("settings")
     object Permissions : NavRoutes("permissions")
     object ComposeMessage : NavRoutes("compose_message")

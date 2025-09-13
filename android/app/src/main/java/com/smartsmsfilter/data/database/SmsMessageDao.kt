@@ -15,8 +15,8 @@ interface SmsMessageDao {
     @Query("SELECT * FROM sms_messages ORDER BY timestamp DESC")
     fun getAllMessages(): Flow<List<SmsMessageEntity>>
     
-    /** Fetches all active (not deleted or archived) messages for a given category. */
-    @Query("SELECT * FROM sms_messages WHERE category = :category AND isDeleted = 0 AND isArchived = 0 ORDER BY timestamp DESC")
+    /** Fetches all active (not deleted) messages for a given category. */
+    @Query("SELECT * FROM sms_messages WHERE category = :category AND isDeleted = 0 ORDER BY timestamp DESC")
     fun getMessagesByCategory(category: String): Flow<List<SmsMessageEntity>>
     
     /** Fetches all archived messages. */

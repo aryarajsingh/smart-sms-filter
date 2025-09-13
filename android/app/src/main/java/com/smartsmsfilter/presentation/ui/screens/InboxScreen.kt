@@ -16,6 +16,7 @@ import com.smartsmsfilter.utils.PermissionManager
 @Composable
 fun InboxScreen(
     onNavigateToThread: (String) -> Unit,
+    onNavigateToStarred: () -> Unit = {},
     modifier: Modifier = Modifier,
     viewModel: SmsViewModel = hiltViewModel(),
     onSettingsClick: (() -> Unit)? = null
@@ -23,19 +24,14 @@ fun InboxScreen(
     val context = LocalContext.current
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     
-    // Trigger message reload when screen appears for the first time or when permissions change
-    LaunchedEffect(Unit) {
-        // Check if we have SMS permissions and reload messages if we do
-        if (PermissionManager.hasAllSmsPermissions(context)) {
-            viewModel.reloadSmsMessages()
-        }
-    }
+    // Messages are automatically loaded in ViewModel init, no need to reload here
     
     UnifiedMessageScreen(
         messages = uiState.inboxMessages,
         viewModel = viewModel,
         tab = MessageTab.INBOX,
         onNavigateToThread = onNavigateToThread,
+        onNavigateToStarred = onNavigateToStarred,
         screenTitle = "Inbox",
         emptyStateTitle = "All clear! 📬",
         emptyStateMessage = "Important messages appear here: OTPs, banking alerts, delivery updates, and messages from your contacts.",
@@ -44,6 +40,7 @@ fun InboxScreen(
         modifier = modifier,
         onSettingsClick = onSettingsClick,
         groupBySender = false, // Grouping is now done in ViewModel
-        unreadCount = uiState.inboxUnreadCount
+        unreadCount = uiState.inboxUnreadCount,
+        showStarredAccess = true // Enable starred messages access for Inbox
     )
 }

@@ -1,0 +1,17 @@
+{
+  "model_type": "Simple Dense Network",
+  "categories": [
+    "INBOX",
+    "SPAM",
+    "OTP",
+    "BANKING",
+    "ECOMMERCE",
+    "NEEDS_REVIEW"
+  ],
+  "max_words": 3000,
+  "max_len": 50,
+  "test_accuracy": 0.45695364475250244,
+  "model_size_mb": 0.0989990234375,
+  "training_samples": 754,
+  "architecture": "Embedding + GlobalAveragePooling1D + Dense layers"
+}

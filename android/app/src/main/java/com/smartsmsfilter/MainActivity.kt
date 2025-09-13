@@ -1,64 +1,51 @@
 package com.smartsmsfilter
 
-import android.Manifest
+import android.app.role.RoleManager
+import android.content.Intent
 import android.content.pm.PackageManager
 import android.os.Bundle
+import android.provider.Telephony
+import android.util.Log
+import android.widget.Toast
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.*
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Block
 import androidx.compose.material.icons.filled.Inbox
 import androidx.compose.material.icons.outlined.QuestionMark
-import androidx.compose.material.icons.filled.Add
-import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.hapticfeedback.HapticFeedbackType
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.core.content.ContextCompat
-import androidx.navigation.NavHostController
+import androidx.hilt.navigation.compose.hiltViewModel
+import androidx.lifecycle.lifecycleScope
+import androidx.navigation.NavType
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
-import androidx.navigation.compose.rememberNavController
 import androidx.navigation.compose.currentBackStackEntryAsState
+import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
-import androidx.navigation.NavType
+import com.smartsmsfilter.data.preferences.PreferencesManager
 import com.smartsmsfilter.presentation.ui.navigation.NavRoutes
 import com.smartsmsfilter.presentation.ui.screens.*
 import com.smartsmsfilter.presentation.viewmodel.OnboardingViewModel
-import com.smartsmsfilter.data.preferences.PreferencesManager
+import com.smartsmsfilter.presentation.viewmodel.SmsViewModel
+import com.smartsmsfilter.ui.state.MessageTab
 import com.smartsmsfilter.ui.theme.SmartSmsFilterTheme
 import com.smartsmsfilter.utils.PermissionManager
 import dagger.hilt.android.AndroidEntryPoint
-import androidx.hilt.navigation.compose.hiltViewModel
-import com.smartsmsfilter.presentation.viewmodel.SmsViewModel
-import com.smartsmsfilter.ui.state.MessageTab
-import com.smartsmsfilter.utils.DefaultSmsAppHelper
-import kotlinx.coroutines.flow.first
-import androidx.lifecycle.lifecycleScope
-import kotlinx.coroutines.launch
 import kotlinx.coroutines.delay
-import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.platform.LocalHapticFeedback
-import androidx.compose.ui.hapticfeedback.HapticFeedbackType
-import androidx.compose.material3.Card
-import androidx.compose.material3.CardDefaults
-import androidx.compose.material3.TextButton
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.setValue
-import androidx.compose.runtime.getValue
-import android.content.Intent
-import android.app.role.RoleManager
-import android.provider.Telephony
-import android.util.Log
-import android.widget.Toast
-import androidx.compose.runtime.collectAsState
-import androidx.compose.runtime.getValue
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.launch
 import javax.inject.Inject
 
 @AndroidEntryPoint
@@ -535,6 +522,9 @@ fun SmartSmsFilterApp() {
                     onNavigateToThread = { address ->
                         navController.navigate(NavRoutes.Thread.createRoute(address))
                     },
+                    onNavigateToStarred = {
+                        navController.navigate(NavRoutes.StarredMessages.route)
+                    },
                     viewModel = smsViewModel,
                     onSettingsClick = { navController.navigate(NavRoutes.Settings.route) }
                 )
@@ -570,6 +560,14 @@ fun SmartSmsFilterApp() {
             composable(NavRoutes.ComposeMessage.route) {
                 ComposeMessageScreen(
                     onNavigateBack = { navController.popBackStack() }
+                )
+            }
+            composable(NavRoutes.StarredMessages.route) {
+                StarredMessagesScreen(
+                    onNavigateBack = { navController.popBackStack() },
+                    onNavigateToSender = { address ->
+                        navController.navigate(NavRoutes.Thread.createRoute(address))
+                    }
                 )
             }
         }

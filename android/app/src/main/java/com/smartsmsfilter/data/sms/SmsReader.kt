@@ -26,23 +26,40 @@ class SmsReader @Inject constructor(
     }
     
     /**
-     * Load all SMS messages from device
+     * Load all SMS messages from device for initial sync only.
+     * This is used ONLY for the first-time load to populate the database.
+     * After that, messages come through SmsReceiver which properly classifies them.
      */
     fun loadAllSmsMessages(): Flow<List<SmsMessage>> = flow {
         val messages = mutableListOf<SmsMessage>()
         
         try {
-            // Query both inbox and sent messages
+            // Query from multiple URIs to ensure we get ALL messages
+            // 1. Get all messages from the main content URI
+            Log.d(TAG, "Loading messages from main SMS URI for initial sync...")
+            val mainMessages = loadMessagesFromUri(Telephony.Sms.CONTENT_URI, false)
+            messages.addAll(mainMessages)
+            Log.d(TAG, "Loaded ${mainMessages.size} messages from main URI")
+            
+            // 2. Also query inbox specifically to ensure we don't miss any
+            Log.d(TAG, "Loading messages from inbox URI...")
             val inboxMessages = loadMessagesFromUri(Telephony.Sms.Inbox.CONTENT_URI, false)
+            val existingIds = messages.map { it.id }.toSet()
+            val newInboxMessages = inboxMessages.filter { it.id !in existingIds }
+            messages.addAll(newInboxMessages)
+            Log.d(TAG, "Added ${newInboxMessages.size} new messages from inbox")
+            
+            // 3. Query sent messages
+            Log.d(TAG, "Loading sent messages...")
             val sentMessages = loadMessagesFromUri(Telephony.Sms.Sent.CONTENT_URI, true)
+            val newSentMessages = sentMessages.filter { it.id !in messages.map { it.id }.toSet() }
+            messages.addAll(newSentMessages)
+            Log.d(TAG, "Added ${newSentMessages.size} sent messages")
             
-            messages.addAll(inboxMessages)
-            messages.addAll(sentMessages)
-            
-            // Sort by timestamp (newest first)
+            // Sort all messages by timestamp
             messages.sortByDescending { it.timestamp }
             
-            Log.d(TAG, "Loaded ${messages.size} SMS messages from device")
+            Log.d(TAG, "Total loaded: ${messages.size} SMS messages from device for initial sync")
         } catch (e: Exception) {
             Log.e(TAG, "Failed to load SMS messages", e)
         }
@@ -57,27 +74,18 @@ class SmsReader @Inject constructor(
         val messages = mutableListOf<SmsMessage>()
         
         try {
-            // Load recent inbox messages
-            val inboxMessages = loadMessagesFromUri(
-                Telephony.Sms.Inbox.CONTENT_URI, 
-                isOutgoing = false, 
-                limit = limit/2
+            // Load ALL messages then take recent ones
+            val allMessages = loadMessagesFromUri(
+                Telephony.Sms.CONTENT_URI,
+                isOutgoing = false
             )
             
-            // Load recent sent messages
-            val sentMessages = loadMessagesFromUri(
-                Telephony.Sms.Sent.CONTENT_URI, 
-                isOutgoing = true, 
-                limit = limit/2
-            )
+            messages.addAll(allMessages)
             
-            messages.addAll(inboxMessages)
-            messages.addAll(sentMessages)
-            
-            // Sort by timestamp and limit
+            // Sort by timestamp (newest first) and take requested limit
             messages.sortByDescending { it.timestamp }
             
-            Log.d(TAG, "Loaded ${messages.size} recent SMS messages")
+            Log.d(TAG, "Loaded ${messages.take(limit).size} recent SMS messages from ${messages.size} total")
         } catch (e: Exception) {
             Log.e(TAG, "Failed to load recent SMS messages", e)
         }
@@ -87,8 +95,7 @@ class SmsReader @Inject constructor(
     
     private suspend fun loadMessagesFromUri(
         uri: Uri, 
-        isOutgoing: Boolean, 
-        limit: Int = 10000
+        isOutgoing: Boolean
     ): List<SmsMessage> {
         val messages = mutableListOf<SmsMessage>()
         
@@ -107,11 +114,12 @@ class SmsReader @Inject constructor(
                     Telephony.Sms.BODY,
                     Telephony.Sms.DATE,
                     Telephony.Sms.READ,
-                    Telephony.Sms.THREAD_ID
+                    Telephony.Sms.THREAD_ID,
+                    Telephony.Sms.TYPE
                 ),
-                null,
-                null,
-                "${Telephony.Sms.DATE} DESC"
+                null,  // No selection - get ALL messages
+                null,  // No selection args
+                "${Telephony.Sms.DATE} DESC"  // Order by date descending
             )
             
             cursor?.use { c ->
@@ -121,23 +129,41 @@ class SmsReader @Inject constructor(
                 val dateIndex = c.getColumnIndexOrThrow(Telephony.Sms.DATE)
                 val readIndex = c.getColumnIndexOrThrow(Telephony.Sms.READ)
                 val threadIndex = c.getColumnIndexOrThrow(Telephony.Sms.THREAD_ID)
+                val typeIndex = c.getColumnIndexOrThrow(Telephony.Sms.TYPE)
+                
+                var count = 0
+                Log.d(TAG, "Cursor has ${c.count} messages from $uri")
                 
                 while (c.moveToNext()) {
+                    count++
+                    if (count % 100 == 0) {
+                        Log.d(TAG, "Processing message $count of ${c.count}")
+                    }
                     val id = if (idIndex >= 0 && !c.isNull(idIndex)) c.getLong(idIndex) else 0L
                     val address = if (addressIndex >= 0 && !c.isNull(addressIndex)) c.getString(addressIndex) else "Unknown"
                     val body = if (bodyIndex >= 0 && !c.isNull(bodyIndex)) c.getString(bodyIndex) else ""
                     val date = if (dateIndex >= 0 && !c.isNull(dateIndex)) c.getLong(dateIndex) else System.currentTimeMillis()
                     val isRead = if (readIndex >= 0 && !c.isNull(readIndex)) c.getInt(readIndex) == 1 else false
                     val threadId = if (threadIndex >= 0 && !c.isNull(threadIndex)) c.getString(threadIndex) else null
+                    val type = if (typeIndex >= 0 && !c.isNull(typeIndex)) c.getInt(typeIndex) else Telephony.Sms.MESSAGE_TYPE_INBOX
                     
                     // Normalize the address for consistency
                     val normalizedAddress = normalizePhoneNumber(address)
                     
-                    // Classify the message using simple rules
-                    val category = if (isOutgoing) {
+                    // Determine if message is outgoing based on TYPE column
+                    val actualIsOutgoing = type == Telephony.Sms.MESSAGE_TYPE_SENT || 
+                                          type == Telephony.Sms.MESSAGE_TYPE_OUTBOX ||
+                                          type == Telephony.Sms.MESSAGE_TYPE_QUEUED
+                    
+                    // For initial sync, use NEEDS_REVIEW category
+                    // Real classification happens through SmsReceiver and ClassificationService
+                    // This prevents overriding already classified messages
+                    val category = if (actualIsOutgoing) {
                         MessageCategory.INBOX // Sent messages go to inbox
                     } else {
-                        classifier.classifyMessage(normalizedAddress, body)
+                        // Don't classify here - let ClassificationService handle it
+                        // Use NEEDS_REVIEW as default for initial load
+                        MessageCategory.NEEDS_REVIEW
                     }
                     
                     messages.add(
@@ -149,10 +175,11 @@ class SmsReader @Inject constructor(
                             category = category,
                             isRead = isRead,
                             threadId = normalizedAddress, // Use normalized address as threadId for consistency
-                            isOutgoing = isOutgoing
+                            isOutgoing = actualIsOutgoing
                         )
                     )
                 }
+                Log.d(TAG, "Processed $count messages from $uri")
             }
             
         } catch (e: Exception) {
@@ -163,15 +190,10 @@ class SmsReader @Inject constructor(
     }
     
     /**
-     * Normalizes phone number for consistent comparison
-     * Removes all non-digit characters except + at the beginning
+     * Normalizes phone number for consistent comparison across the whole app.
+     * Delegates to the shared UI utils normalizer so DB, grouping and receiver all agree.
      */
     private fun normalizePhoneNumber(phoneNumber: String): String {
-        val cleaned = phoneNumber.trim()
-        return if (cleaned.startsWith("+")) {
-            "+" + cleaned.substring(1).replace(Regex("[^0-9]"), "")
-        } else {
-            cleaned.replace(Regex("[^0-9]"), "")
-        }
+        return com.smartsmsfilter.ui.utils.normalizePhoneNumber(phoneNumber)
     }
 }

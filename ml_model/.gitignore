@@ -1,0 +1,46 @@
+# Byte-compiled / optimized / DLL files
+__pycache__/
+*.py[cod]
+*$py.class
+
+# ML Model files
+*.pkl
+*.joblib
+*.h5
+*.pb
+
+# Data files
+data/raw/*
+data/processed/*
+!data/raw/.gitkeep
+!data/processed/.gitkeep
+
+# Jupyter Notebook checkpoints
+.ipynb_checkpoints
+
+# Environment
+venv/
+env/
+.env
+
+# Logs
+logs/*.log
+*.log
+
+# IDE
+.vscode/
+.idea/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Model artifacts
+models/trained/*
+!models/trained/.gitkeep
+models/experiments/*
+!models/experiments/.gitkeep
+
+# Reports
+reports/figures/*
+!reports/figures/.gitkeep

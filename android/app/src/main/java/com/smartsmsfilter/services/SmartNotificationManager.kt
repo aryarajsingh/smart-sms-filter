@@ -21,7 +21,8 @@ import javax.inject.Singleton
 @Singleton
 class SmartNotificationManager @Inject constructor(
     @ApplicationContext private val context: Context,
-    private val preferencesManager: PreferencesManager
+    private val preferencesManager: PreferencesManager,
+    private val contactManager: com.smartsmsfilter.data.contacts.ContactManager
 ) {
     companion object {
         // Notification Channels
@@ -111,14 +112,10 @@ class SmartNotificationManager @Inject constructor(
      * Show smart notification based on message category and user preferences
      */
     fun showSmartNotification(message: SmsMessage) {
-        android.util.Log.d("SmartNotificationManager", "showSmartNotification called for message: ${message.sender}")
-        
         val preferences = runBlocking { preferencesManager.userPreferences.first() }
-        android.util.Log.d("SmartNotificationManager", "Smart notifications enabled: ${preferences.enableSmartNotifications}")
         
         // Check if smart notifications are enabled
         if (!preferences.enableSmartNotifications) {
-            android.util.Log.d("SmartNotificationManager", "Smart notifications disabled, falling back to basic")
             // Fall back to normal notification
             showBasicNotification(message)
             return
@@ -265,26 +262,19 @@ class SmartNotificationManager @Inject constructor(
         
         // Check if notifications are enabled
         if (!NotificationManagerCompat.from(context).areNotificationsEnabled()) {
-            android.util.Log.w("SmartNotificationManager", "Notifications are disabled for this app")
             return
         }
         
         // Show the notification
-        android.util.Log.d("SmartNotificationManager", "Attempting to show notification for ${message.category} message")
         with(NotificationManagerCompat.from(context)) {
             try {
                 val notification = builder.build()
                 val notificationId = getNotificationId(message.sender)
-                android.util.Log.d("SmartNotificationManager", "Notification built successfully, showing with ID: $notificationId")
                 notify(notificationId, notification)
-                android.util.Log.d("SmartNotificationManager", "Notification shown successfully")
             } catch (e: SecurityException) {
-                android.util.Log.e("SmartNotificationManager", "SecurityException showing notification", e)
-                // Handle missing notification permission
-                e.printStackTrace()
+                // Handle missing notification permission - silently continue
             } catch (e: Exception) {
-                android.util.Log.e("SmartNotificationManager", "Exception showing notification", e)
-                e.printStackTrace()
+                // Handle other notification errors - silently continue
             }
         }
     }
@@ -293,19 +283,30 @@ class SmartNotificationManager @Inject constructor(
      * Get appropriate notification content based on message category
      */
     private fun getNotificationContent(message: SmsMessage): Pair<String, String> {
+        // Try to get contact name for the sender
+        val senderDisplay = runBlocking {
+            try {
+                val contact = contactManager.getContactByPhoneNumber(message.sender)
+                contact?.name ?: message.sender
+            } catch (e: Exception) {
+                // Fallback to phone number if contact lookup fails
+                message.sender
+            }
+        }
+        
         return when (message.category) {
             MessageCategory.INBOX -> {
                 if (isImportantMessage(message)) {
-                    Pair("🔴 Important: ${message.sender}", getTruncatedContent(message.content, 100))
+                    Pair("🔴 Important: $senderDisplay", getTruncatedContent(message.content, 100))
                 } else {
-                    Pair(message.sender, getTruncatedContent(message.content, 100))
+                    Pair(senderDisplay, getTruncatedContent(message.content, 100))
                 }
             }
             MessageCategory.SPAM -> {
-                Pair("📧 Promotional: ${message.sender}", getTruncatedContent(message.content, 80))
+                Pair("📧 Promotional: $senderDisplay", getTruncatedContent(message.content, 80))
             }
             MessageCategory.NEEDS_REVIEW -> {
-                Pair("⚠️ Review Required: ${message.sender}", "Tap to categorize this message")
+                Pair("⚠️ Review Required: $senderDisplay", "Tap to categorize this message")
             }
         }
     }

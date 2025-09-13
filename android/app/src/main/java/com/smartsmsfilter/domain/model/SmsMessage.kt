@@ -27,5 +27,6 @@ enum class MessageCategory {
 data class MessageClassification(
     val category: MessageCategory,
     val confidence: Float,
-    val reasons: List<String> = emptyList()
+    val reasons: List<String> = emptyList(),
+    val messageId: Long? = null
 )

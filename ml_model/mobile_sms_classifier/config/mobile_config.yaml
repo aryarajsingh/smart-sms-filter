@@ -1,0 +1,117 @@
+# Mobile SMS Classifier Configuration
+# Optimized for smartphone deployment
+
+# Model Configuration
+model:
+  name: "distilbert-base-uncased"  # Lightweight BERT variant
+  max_length: 128                  # SMS are typically <160 chars
+  target_size_mb: 20              # Maximum model size for mobile
+  target_inference_ms: 100        # Target inference time
+  
+# SMS Classification Categories (Indian SMS focused)
+classification:
+  categories:
+    - "INBOX"      # Important personal/business messages
+    - "SPAM"       # Promotional/spam messages
+    - "OTP"        # OTP and verification codes
+    - "BANKING"    # Banking and financial messages
+    - "ECOMMERCE"  # Shopping and delivery notifications
+    - "NEEDS_REVIEW" # Uncertain messages requiring manual review
+  
+  # Confidence thresholds
+  high_confidence_threshold: 0.8   # Above this = auto-classify
+  review_threshold: 0.4           # Below this = needs review
+  
+# Training Configuration
+training:
+  epochs: 5                       # Conservative for mobile models
+  batch_size: 16                  # Memory-friendly batch size
+  learning_rate: 2e-5             # Standard for BERT fine-tuning
+  validation_split: 0.2           # 20% for validation
+  early_stopping_patience: 2      # Stop if no improvement
+  gradient_clipping: 1.0          # Prevent gradient explosion
+  
+# TensorFlow Lite Conversion
+tflite:
+  quantization: "dynamic"         # Options: dynamic, int8, float16
+  optimize_for_size: true         # Prioritize size over speed
+  allow_custom_ops: false         # Keep compatibility high
+  experimental_new_quantizer: true
+  
+# Data Configuration
+data:
+  max_training_samples: 50000     # Limit training data size
+  augmentation_enabled: true      # Data augmentation for better generalization
+  indian_patterns_weight: 2.0     # Weight boost for Indian SMS patterns
+  
+# Performance Monitoring
+monitoring:
+  track_inference_time: true
+  track_memory_usage: true
+  track_battery_impact: true
+  log_classification_stats: true
+  
+# Mobile Deployment Settings
+mobile:
+  android_min_api: 21            # Android 5.0+
+  prefer_cpu_inference: true     # Most reliable on mobile
+  thread_pool_size: 2            # Conservative threading
+  memory_limit_mb: 256           # Maximum memory usage
+  
+# API Configuration (for testing)
+api:
+  host: "localhost"
+  port: 8080
+  max_request_size_mb: 1
+  timeout_seconds: 10
+  
+# Logging
+logging:
+  level: "INFO"
+  format: "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
+  file: "logs/mobile_sms_classifier.log"
+  max_file_size_mb: 10
+  backup_count: 5
+  
+# Paths
+paths:
+  models: "./models"
+  data: "./data"
+  logs: "./logs"
+  cache: "./cache"
+  android_assets: "../../../android/app/src/main/assets"
+
+# Indian SMS Patterns (for hybrid classification)
+indian_patterns:
+  otp_keywords: ["otp", "verification", "verify", "code", "pin"]
+  banking_keywords: ["debited", "credited", "account", "balance", "upi", "imps", "neft"]
+  spam_keywords: ["congratulations", "winner", "prize", "urgent", "limited offer", "call now"]
+  ecommerce_keywords: ["order", "delivered", "shipped", "amazon", "flipkart", "tracking"]
+  
+  # Common Indian bank prefixes
+  bank_prefixes: ["SBI", "HDFC", "ICICI", "AXIS", "PNB", "BOI", "CANARA"]
+  
+  # Common service provider patterns
+  service_patterns: ["^[A-Z]{2}-[A-Z0-9]+$", "^[A-Z]{6}$"]  # DLT header patterns
+
+# Feature Engineering
+features:
+  use_message_length: true
+  use_special_char_ratio: true
+  use_number_patterns: true
+  use_url_detection: true
+  use_sender_patterns: true
+  use_time_features: false        # Not available for single message classification
+  
+# Model Versioning
+versioning:
+  current_version: "1.0.0"
+  update_check_url: null          # For future OTA updates
+  compatibility_version: "1.0"    # Minimum compatible version
+
+# Performance Benchmarks
+benchmarks:
+  target_accuracy: 0.90           # 90% accuracy minimum
+  target_precision_spam: 0.85     # Don't miss spam
+  target_recall_important: 0.95   # Don't miss important messages
+  max_false_positive_rate: 0.05   # Maximum false positives

@@ -1,15 +1,14 @@
 package com.smartsmsfilter.data.repository
 
-import android.util.Log
 import com.smartsmsfilter.data.database.SmsMessageDao
 import com.smartsmsfilter.data.model.toDomain
 import com.smartsmsfilter.data.model.toEntity
 import com.smartsmsfilter.domain.model.MessageCategory
 import com.smartsmsfilter.domain.model.SmsMessage
 import com.smartsmsfilter.domain.repository.SmsRepository
-import com.smartsmsfilter.data.model.toDomain
-import com.smartsmsfilter.domain.model.toDomain
 import com.smartsmsfilter.domain.model.toEntity
+import com.smartsmsfilter.domain.model.StarredMessage
+import com.smartsmsfilter.domain.model.toDomain
 import com.smartsmsfilter.domain.common.Result
 import com.smartsmsfilter.domain.common.suspendResultOf
 import com.smartsmsfilter.domain.common.AppException
@@ -49,7 +48,6 @@ class SmsRepositoryImpl @Inject constructor(
         try {
             // Validate message data
             if (message.sender.isBlank() || message.content.isBlank()) {
-                Log.w("SmsRepository", "Attempting to insert message with empty sender or content")
                 return@suspendResultOf -2L // Invalid message
             }
             
@@ -63,7 +61,6 @@ class SmsRepositoryImpl @Inject constructor(
             if (!isDuplicate) {
                 dao.insertMessage(message.toEntity())
             } else {
-                Log.d("SmsRepository", "Skipping duplicate message from ${message.sender}")
                 -1L // Indicate duplicate
             }
         } catch (e: Exception) {
@@ -159,14 +156,10 @@ class SmsRepositoryImpl @Inject constructor(
     }
     
     override suspend fun moveToCategoryBatch(messageIds: List<Long>, category: MessageCategory): Result<Unit> = suspendResultOf {
-        android.util.Log.d("SmsRepositoryImpl", "Starting batch category move for ${messageIds.size} messages to $category")
         database.withTransaction {
             try {
-                android.util.Log.d("SmsRepositoryImpl", "Executing DAO batch move with IDs: $messageIds")
                 dao.moveToCategoryBatch(messageIds, category.name)
-                android.util.Log.d("SmsRepositoryImpl", "Successfully completed batch move to category: $category")
             } catch (e: Exception) {
-                android.util.Log.e("SmsRepositoryImpl", "Error in DAO batch move operation", e)
                 throw AppException.DatabaseError("moveToCategoryBatch", e)
             }
         }
