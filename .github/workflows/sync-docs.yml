@@ -22,34 +22,35 @@ jobs:
       shell: bash
       run: |
         echo "Syncing documentation from android/ to root..."
-
+        
+        # Create README.md with proper header and content
         {
           echo "<!-- This file is auto-generated from android/README.md. Do not edit directly. -->"
           echo "<!-- Last synchronized: $(date -u +'%Y-%m-%d %H:%M:%S UTC') -->"
-          echo
+          echo ""
           cat android/README.md
-          echo
+          echo ""
+          echo ""
           echo "## 📁 Project Structure"
-          echo
+          echo ""
           echo "The main Android application is located in the android/ directory. All development should be done there."
-          echo
-          printf "%s\n" \
-            "smart-sms-filter/" \
-            "├── android/          # Main Android application" \
-            "│   ├── app/         # Application module  " \
-            "│   ├── gradle/      # Gradle wrapper" \
-            "│   └── README.md    # Source documentation (edit this)" \
-            "├── docs/            # Additional documentation" \
-            "├── models/          # ML models (future)" \
-            "├── scripts/         # Utility scripts" \
-            "└── README.md        # Auto-synced from android/README.md"
-          echo
-          echo "> Note: Always edit documentation in android/ directory. Root files are auto-synchronized."
+          echo ""
+          echo "    smart-sms-filter/"
+          echo "    ├── android/          # Main Android application"
+          echo "    │   ├── app/         # Application module"
+          echo "    │   ├── gradle/      # Gradle wrapper"
+          echo "    │   └── README.md    # Source documentation (edit this)"
+          echo "    ├── docs/            # Additional documentation"
+          echo "    ├── models/          # ML models (future)"
+          echo "    ├── scripts/         # Utility scripts"
+          echo "    └── README.md        # Auto-synced from android/README.md"
+          echo ""
+          echo "> **Note:** Always edit documentation in android/ directory. Root files are auto-synchronized."
         } > README.md
-
+        
         # Copy CHANGELOG
         cp android/CHANGELOG.md CHANGELOG.md
-
+        
         echo "Documentation sync complete"
     
     - name: Check for changes
