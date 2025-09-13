@@ -4,65 +4,66 @@ on:
   push:
     branches: [ master, main ]
     paths:
-      - 'android/README.md'
-      - 'android/CHANGELOG.md'
+      - 'README.md'
+      - 'CHANGELOG.md'
   workflow_dispatch:
 
 jobs:
   sync-docs:
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
     
     steps:
     - name: Checkout repository
-      uses: actions/checkout@v3
+      uses: actions/checkout@v4
       with:
-        token: ${{ secrets.GITHUB_TOKEN }}
+        fetch-depth: 0
     
     - name: Sync documentation files
+      id: sync
       shell: bash
       run: |
-        echo "Syncing documentation from android/ to root..."
+        echo "Syncing documentation files..."
         
-        # Create README.md with proper header and content
-        {
-          echo "<!-- This file is auto-generated from android/README.md. Do not edit directly. -->"
-          echo "<!-- Last synchronized: $(date -u +'%Y-%m-%d %H:%M:%S UTC') -->"
-          echo ""
-          cat android/README.md
-          echo ""
-          echo ""
-          echo "## 📁 Project Structure"
-          echo ""
-          echo "The main Android application is located in the android/ directory. All development should be done there."
-          echo ""
-          echo "    smart-sms-filter/"
-          echo "    |-- android/          # Main Android application"
-          echo "    |   |-- app/         # Application module"
-          echo "    |   |-- gradle/      # Gradle wrapper"
-          echo "    |   \`-- README.md    # Source documentation (edit this)"
-          echo "    |-- docs/            # Additional documentation"
-          echo "    |-- models/          # ML models (future)"
-          echo "    |-- scripts/         # Utility scripts"
-          echo "    \`-- README.md        # Auto-synced from android/README.md"
-          echo ""
-          echo "> **Note:** Always edit documentation in android/ directory. Root files are auto-synchronized."
-        } > README.md
+        # Create android directory if it doesn't exist
+        mkdir -p android
         
-        # Copy CHANGELOG
-        cp android/CHANGELOG.md CHANGELOG.md
+        # Track if changes were made
+        CHANGED=false
         
-        echo "Documentation sync complete"
-    
-    - name: Check for changes
-      id: git-check
-      run: |
-        git diff --exit-code || echo "changed=true" >> $GITHUB_OUTPUT
+        # Check if README.md exists in root and sync to android
+        if [ -f "README.md" ]; then
+          if [ ! -f "android/README.md" ] || ! diff -q README.md android/README.md > /dev/null 2>&1; then
+            echo "Copying README.md to android/"
+            cp README.md android/README.md
+            CHANGED=true
+          fi
+        fi
+        
+        # Check if CHANGELOG.md exists in root and sync to android
+        if [ -f "CHANGELOG.md" ]; then
+          if [ ! -f "android/CHANGELOG.md" ] || ! diff -q CHANGELOG.md android/CHANGELOG.md > /dev/null 2>&1; then
+            echo "Copying CHANGELOG.md to android/"
+            cp CHANGELOG.md android/CHANGELOG.md
+            CHANGED=true
+          fi
+        fi
+        
+        if [ "$CHANGED" = true ]; then
+          echo "changed=true" >> $GITHUB_OUTPUT
+          echo "Documentation files synced successfully"
+        else
+          echo "No changes needed"
+        fi
     
     - name: Commit and push if changed
-      if: steps.git-check.outputs.changed == 'true'
+      if: steps.sync.outputs.changed == 'true'
       run: |
-        git config --local user.email "action@github.com"
-        git config --local user.name "GitHub Action"
-        git add README.md CHANGELOG.md
-        git commit -m "docs: Auto-sync documentation from android directory [skip ci]"
-        git push
+        git config --local user.email "41898282+github-actions[bot]@users.noreply.github.com"
+        git config --local user.name "github-actions[bot]"
+        git add android/README.md android/CHANGELOG.md
+        git diff --staged --quiet || (
+          git commit -m "docs: Auto-sync documentation to android directory [skip ci]"
+          git push
+        )
