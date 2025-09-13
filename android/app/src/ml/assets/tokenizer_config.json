@@ -1,0 +1,12 @@
+{
+  "vocab_size": 1325,
+  "max_length": 60,
+  "categories": [
+    "INBOX",
+    "SPAM",
+    "OTP",
+    "BANKING",
+    "ECOMMERCE",
+    "NEEDS_REVIEW"
+  ]
+}

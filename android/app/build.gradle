@@ -46,10 +46,30 @@ android {
             abiFilters 'armeabi-v7a', 'arm64-v8a', 'x86', 'x86_64'
         }
 
-        // TensorFlow Lite model configuration - Temporarily disabled
-        // aaptOptions {
-        //     noCompress "tflite"
-        // }
+        // TensorFlow Lite model configuration
+        aaptOptions {
+            noCompress "tflite"
+        }
+    }
+
+    // Product flavors for different classification modes
+    flavorDimensions "classifier"
+    productFlavors {
+        classical {
+            dimension "classifier"
+            applicationIdSuffix ".classical"
+            versionNameSuffix "-classical"
+            buildConfigField "String", "CLASSIFIER_TYPE", '"CLASSICAL"'
+            buildConfigField "boolean", "USE_ML_CLASSIFIER", "false"
+        }
+        ml {
+            dimension "classifier"
+            applicationIdSuffix ".ml"
+            versionNameSuffix "-ml"
+            buildConfigField "String", "CLASSIFIER_TYPE", '"ML"'
+            buildConfigField "boolean", "USE_ML_CLASSIFIER", "true"
+            buildConfigField "String", "MODEL_VERSION", '"1.0.0"'
+        }
     }
 
     buildTypes {
@@ -140,10 +160,11 @@ dependencies {
     implementation 'androidx.datastore:datastore-preferences:1.0.0'
     implementation 'androidx.datastore:datastore-core:1.0.0'
     
-    // TensorFlow Lite for AI Model - Temporarily disabled for compatibility
-    // implementation 'org.tensorflow:tensorflow-lite:' + rootProject.tensorflowLiteVersion
-    // implementation 'org.tensorflow:tensorflow-lite-support:0.4.4'
-    // implementation 'org.tensorflow:tensorflow-lite-metadata:0.4.4'
+    // TensorFlow Lite for AI Model - Only included in ML variant
+    mlImplementation 'org.tensorflow:tensorflow-lite:2.13.0'
+    mlImplementation 'org.tensorflow:tensorflow-lite-support:0.4.4'
+    mlImplementation 'org.tensorflow:tensorflow-lite-metadata:0.4.4'
+    mlImplementation 'org.tensorflow:tensorflow-lite-gpu:2.13.0' // Optional GPU acceleration
     
     // Permissions
     implementation 'com.google.accompanist:accompanist-permissions:0.32.0'
