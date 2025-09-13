@@ -83,6 +83,9 @@ class SmsViewModel @Inject constructor(
         // Register ContentObserver for SMS provider changes (for background updates)
         registerSmsContentObserver()
         
+        // Register broadcast receiver for new message notifications
+        registerMessageBroadcastReceiver()
+        
         // Load ALL messages immediately on startup
         loadAllMessagesImmediately()
 
@@ -108,8 +111,9 @@ class SmsViewModel @Inject constructor(
                             content = latestInboxMessage.content
                         ) to sender
                     }
-                    .filter { it.first != null }
-                    .map { it.first!! to it.second }
+                    .mapNotNull { (message, sender) -> 
+                        message?.let { it to sender }
+                    }
                     // Sort by latest inbox activity (most recent message from sender)
                     .sortedByDescending { (message, _) ->
                         message.timestamp
@@ -159,8 +163,9 @@ class SmsViewModel @Inject constructor(
                             content = latestInboxMessage.content
                         ) to sender
                     }
-                    .filter { it.first != null }
-                    .map { it.first!! to it.second }
+                    .mapNotNull { (message, sender) -> 
+                        message?.let { it to sender }
+                    }
                     .sortedByDescending { (message, _) -> message.timestamp }
                     .map { it.first }
 
@@ -506,6 +511,16 @@ class SmsViewModel @Inject constructor(
         return 0 // Placeholder
     }
     
+    // Get a specific message by ID
+    suspend fun getMessageById(messageId: Long): SmsMessage? {
+        return try {
+            smsRepository.getMessageById(messageId)
+        } catch (e: Exception) {
+            android.util.Log.e("SmsViewModel", "Failed to get message by ID: $messageId", e)
+            null
+        }
+    }
+    
     // Removed pull-to-refresh - messages auto-sync in real-time
     
     private fun loadAllMessagesImmediately() {
@@ -595,6 +610,19 @@ class SmsViewModel @Inject constructor(
     // ContentObserver for monitoring SMS database changes
     private var smsContentObserver: ContentObserver? = null
     
+    // BroadcastReceiver for new message notifications
+    private val messageReceiver = object : BroadcastReceiver() {
+        override fun onReceive(context: Context?, intent: Intent?) {
+            if (intent?.action == "com.smartsmsfilter.NEW_MESSAGE_RECEIVED") {
+                val messageId = intent.getLongExtra("message_id", -1L)
+                val category = intent.getStringExtra("category")
+                android.util.Log.d("SmsViewModel", "New message received: ID=$messageId, Category=$category")
+                // Force refresh of message counts
+                refreshMessageCounts()
+            }
+        }
+    }
+    
     private fun registerSmsContentObserver() {
         try {
             // Create the observer inline during registration
@@ -625,6 +653,15 @@ class SmsViewModel @Inject constructor(
         }
     }
     
+    private fun registerMessageBroadcastReceiver() {
+        try {
+            val filter = IntentFilter("com.smartsmsfilter.NEW_MESSAGE_RECEIVED")
+            context.registerReceiver(messageReceiver, filter)
+        } catch (e: Exception) {
+            android.util.Log.e("SmsViewModel", "Failed to register broadcast receiver", e)
+        }
+    }
+    
     override fun onCleared() {
         super.onCleared()
         // Unregister content observer
@@ -632,6 +669,12 @@ class SmsViewModel @Inject constructor(
             smsContentObserver?.let { observer ->
                 context.contentResolver.unregisterContentObserver(observer)
             }
+        } catch (e: Exception) {
+            // Ignore if already unregistered
+        }
+        // Unregister broadcast receiver
+        try {
+            context.unregisterReceiver(messageReceiver)
         } catch (e: Exception) {
             // Ignore if already unregistered
         }

@@ -16,6 +16,7 @@ import java.nio.MappedByteBuffer
 import java.nio.channels.FileChannel
 import javax.inject.Inject
 import javax.inject.Singleton
+import kotlinx.coroutines.delay
 
 /**
  * TensorFlow Lite implementation of SMS classifier
@@ -81,13 +82,19 @@ class TensorFlowLiteSmsClassifier @Inject constructor(
     }
     
     override suspend fun classifyMessage(message: SmsMessage): MessageClassification {
-        try {
-            // Ensure model is initialized
+        return try {
+            // Ensure model is initialized with retry logic
             if (!isInitialized) {
-                initialize()
+                try {
+                    initialize()
+                } catch (e: Exception) {
+                    Log.e(TAG, "Failed to initialize model, retrying once", e)
+                    delay(500) // Brief delay before retry
+                    initialize() // One retry attempt
+                }
             }
             
-            return withContext(Dispatchers.Default) {
+            withContext(Dispatchers.Default) {
                 val startTime = System.currentTimeMillis()
                 
                 // Tokenize input text
@@ -97,8 +104,18 @@ class TensorFlowLiteSmsClassifier @Inject constructor(
                 val input = Array(1) { inputSequence }
                 val output = Array(1) { FloatArray(6) } // 6 ML model categories
                 
-                // Run inference
-                interpreter?.run(input, output)
+                // Run inference with null check
+                val currentInterpreter = interpreter
+                if (currentInterpreter == null) {
+                    Log.e(TAG, "Interpreter is null, cannot run inference")
+                    return@withContext MessageClassification(
+                        category = MessageCategory.NEEDS_REVIEW,
+                        confidence = 0.0f,
+                        reasons = listOf("ML model not available")
+                    )
+                }
+                
+                currentInterpreter.run(input, output)
                 
                 val probabilities = output[0]
                 val maxIndex = probabilities.indices.maxByOrNull { probabilities[it] } ?: 0
@@ -120,13 +137,27 @@ class TensorFlowLiteSmsClassifier @Inject constructor(
                     reasons = reasons
                 )
             }
+        } catch (e: OutOfMemoryError) {
+            Log.e(TAG, "Out of memory during classification", e)
+            // Try to recover by clearing memory and returning fallback
+            System.gc()
+            MessageClassification(
+                category = MessageCategory.NEEDS_REVIEW,
+                confidence = 0.0f,
+                reasons = listOf("Insufficient memory for ML classification")
+            )
         } catch (e: Exception) {
-            Log.e(TAG, "Error classifying message with TensorFlow Lite", e)
-            // Fallback to needs review with low confidence
-            return MessageClassification(
+            Log.e(TAG, "Error classifying message: ${e.message}", e)
+            // Provide detailed fallback based on error type
+            val reason = when (e) {
+                is IllegalArgumentException -> "Invalid input format"
+                is IllegalStateException -> "Model in invalid state"
+                else -> "ML classification failed: ${e.javaClass.simpleName}"
+            }
+            MessageClassification(
                 category = MessageCategory.NEEDS_REVIEW,
                 confidence = 0.1f,
-                reasons = listOf("ML classification failed, needs manual review")
+                reasons = listOf(reason, "Message requires manual review")
             )
         }
     }
@@ -141,10 +172,22 @@ class TensorFlowLiteSmsClassifier @Inject constructor(
         message: SmsMessage, 
         userCorrection: MessageClassification
     ) {
-        // TensorFlow Lite models are static, cannot learn online
-        // This would require retraining the model offline
-        Log.d(TAG, "Learning from correction: ${message.sender} -> ${userCorrection.category}")
-        // TODO: Could store corrections for future model retraining
+        try {
+            // TensorFlow Lite models are static, cannot learn online
+            // Store corrections for future model retraining
+            Log.d(TAG, "Learning from correction: ${message.sender} -> ${userCorrection.category}")
+            
+            // Store feedback in SharedPreferences for analytics
+            context.getSharedPreferences("ml_feedback", Context.MODE_PRIVATE)
+                .edit()
+                .putString(
+                    "feedback_${System.currentTimeMillis()}",
+                    "${message.sender}|${userCorrection.category}"
+                )
+                .apply()
+        } catch (e: Exception) {
+            Log.e(TAG, "Error storing user feedback", e)
+        }
     }
     
     override fun getConfidenceThreshold(): Float = CONFIDENCE_THRESHOLD

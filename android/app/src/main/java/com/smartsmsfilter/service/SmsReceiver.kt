@@ -153,7 +153,13 @@ class SmsReceiver : BroadcastReceiver() {
                 notificationManager.showSmartNotification(finalMessage)
                 Log.d(TAG, "Notification sent for category: ${classification.category}")
                 
-                // Note: UI refresh is handled by reactive Flows, no broadcast needed
+                // Send a broadcast to notify the app that a new message was received
+                // This ensures the UI updates even if the app is in the foreground
+                val refreshIntent = Intent("com.smartsmsfilter.NEW_MESSAGE_RECEIVED")
+                refreshIntent.putExtra("message_id", finalMessage.id)
+                refreshIntent.putExtra("category", finalMessage.category.name)
+                context?.sendBroadcast(refreshIntent)
+                Log.d(TAG, "Broadcast sent for UI refresh")
                 
             } catch (e: Exception) {
                 Log.e(TAG, "Unexpected error processing SMS", e)

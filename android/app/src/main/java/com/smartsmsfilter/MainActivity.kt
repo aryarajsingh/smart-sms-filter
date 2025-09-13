@@ -69,6 +69,9 @@ class MainActivity : ComponentActivity() {
     private val _hasSmsCorePermissions = MutableStateFlow(false)
     val hasSmsCorePermissions = _hasSmsCorePermissions.asStateFlow()
     
+    // Store message ID from notification to navigate to
+    internal var notificationMessageId: Long? = null
+    
     private val requestPermissionLauncher = registerForActivityResult(
         ActivityResultContracts.RequestMultiplePermissions()
     ) { permissions ->
@@ -103,6 +106,27 @@ class MainActivity : ComponentActivity() {
         Log.d(TAG, "onResume called. Checking default SMS app status.")
         checkDefaultSmsAppStatus()
         updatePermissionStatus()
+    }
+    
+    override fun onNewIntent(intent: Intent?) {
+        super.onNewIntent(intent)
+        Log.d(TAG, "onNewIntent called")
+        intent?.let {
+            handleNotificationIntent(it)
+        }
+    }
+    
+    private fun handleNotificationIntent(intent: Intent?) {
+        intent?.let {
+            val messageId = it.getLongExtra("message_id", -1L)
+            val fromNotification = it.getBooleanExtra("from_notification", false)
+            
+            if (fromNotification && messageId != -1L) {
+                Log.d(TAG, "Handling notification intent for message ID: $messageId")
+                // Store the message ID to navigate to after UI is ready
+                notificationMessageId = messageId
+            }
+        }
     }
 
     private fun checkDefaultSmsAppStatus() {
@@ -292,6 +316,9 @@ class MainActivity : ComponentActivity() {
 
         // Initialize permission status
         updatePermissionStatus()
+        
+        // Handle notification intent if present
+        handleNotificationIntent(intent)
 
         setContent {
             val prefs by preferencesManager.userPreferences.collectAsState(initial = com.smartsmsfilter.data.preferences.UserPreferences())
@@ -518,6 +545,32 @@ fun SmartSmsFilterApp() {
                 }
             }
             composable(NavRoutes.Inbox.route) {
+                // Handle notification navigation after inbox loads
+                LaunchedEffect(Unit) {
+                    mainActivity?.notificationMessageId?.let { messageId ->
+                        // Clear the notification message ID
+                        mainActivity.notificationMessageId = null
+                        // Navigate to the message's thread
+                        kotlinx.coroutines.GlobalScope.launch {
+                            kotlinx.coroutines.delay(500) // Give time for messages to load
+                            try {
+                                // Find the message in the loaded messages
+                                val uiState = smsViewModel.uiState.value
+                                val allMessages = uiState.inboxMessages + uiState.spamMessages + uiState.reviewMessages
+                                val message = allMessages.find { it.id == messageId }
+                                message?.let {
+                                    val normalizedAddress = com.smartsmsfilter.ui.utils.normalizePhoneNumber(it.sender)
+                                    kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Main) {
+                                        navController.navigate(NavRoutes.Thread.createRoute(normalizedAddress))
+                                    }
+                                }
+                            } catch (e: Exception) {
+                                android.util.Log.e("MainActivity", "Failed to navigate to message from notification", e)
+                            }
+                        }
+                    }
+                }
+                
                 InboxScreen(
                     onNavigateToThread = { address ->
                         navController.navigate(NavRoutes.Thread.createRoute(address))
