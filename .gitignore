@@ -206,3 +206,11 @@ config/database.yml
 .env.development.local
 .env.test.local
 .env.production.local
+
+# Heap dumps and profiling
+*.hprof
+android/*.hprof
+
+# Generated assets and external outputs
+IconKitchen-Output/
+icons-output/
