@@ -28,6 +28,51 @@ All notable changes to this project will be documented in this file.
 
 The format is inspired by Keep a Changelog. Dates are in YYYY-MM-DD.
 
+## [1.4.0] - 2025-09-13
+
+### Major Features
+- **🧠 Complete User Learning System**: Implemented privacy-first machine learning that adapts to user preferences without storing personal data
+  - Contextual learning from user corrections (mark as spam/important)
+  - Sender reputation tracking with automatic inbox/spam routing
+  - Memory-only storage ensuring complete privacy
+  - Consistent "why" explanations that don't alter learning state
+- **⭐ Starred Messages System**: Added ability to star important messages within chat conversations
+  - In-chat starring and un-starring functionality
+  - Dedicated starred messages management
+  - Navigation from starred messages to original chat context
+
+### UX Improvements
+- **📱 Simplified Message Lists**: Removed importance marking from main lists for cleaner, focused UI
+- **🎯 Enhanced Classification Logic**: Improved SMS categorization with strict priority order
+  - Known contacts always trusted and routed to Inbox
+  - OTP messages automatically protected from spam classification
+  - Promotional content better detected with expanded keyword patterns
+- **🔄 Standardized Loading States**: Implemented comprehensive loading system with progress indicators
+  - Consistent loading overlays, skeleton loaders, and button states
+  - Proper cancellation support and progress tracking
+  - Better user feedback during operations
+
+### Error Handling & Reliability
+- **🛡️ Advanced Error Management**: Replaced generic error messages with actionable UiError system
+  - Retry mechanisms with exponential backoff
+  - Clear, user-friendly error descriptions
+  - Contextual recovery options
+- **🔍 Enhanced Classification Constants**: Expanded OTP regex patterns and promotional keywords
+  - Better coverage for Indian banking and service providers
+  - More accurate promotional content detection
+  - Improved official sender pattern recognition
+
+### Code Quality & Architecture
+- **🏗️ Improved Data Flow**: Enhanced state management and dependency injection
+- **🧪 Comprehensive Testing**: Added extensive test coverage for learning system and classification logic
+- **📚 Complete Documentation**: Added detailed UX audit documents and improvement recommendations
+- **🔧 Code Cleanup**: Removed unused code, fixed compiler warnings, and improved .gitignore
+
+### Technical Improvements
+- **⚡ Better Performance**: Optimized database queries and reduced memory usage
+- **🔐 Enhanced Security**: Proper backup rules and data protection for production builds
+- **📦 Build Optimizations**: Improved Gradle configuration and dependency management
+
 ## [1.2.1] - 2025-09-12
 
 ### Fixed
@@ -69,5 +114,6 @@ The format is inspired by Keep a Changelog. Dates are in YYYY-MM-DD.
 ### Fixed
 - Assorted build and layout fixes.
 
+[1.4.0]: https://github.com/aryarajsingh/smart-sms-filter/releases/1.4.0
 [1.2.0]: https://example.com/releases/1.2.0
 [1.1.0]: https://example.com/releases/1.1.0

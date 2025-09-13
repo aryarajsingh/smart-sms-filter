@@ -33,8 +33,8 @@ android {
         applicationId "com.smartsmsfilter"
         minSdk rootProject.minSdk
         targetSdk rootProject.targetSdk
-        versionCode 8  // User Learning System release
-        versionName "1.3.0" // User Learning System release
+        versionCode 9  // UX Enhancements and System Improvements
+        versionName "1.4.0" // UX Enhancements and System Improvements
 
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
         vectorDrawables {
