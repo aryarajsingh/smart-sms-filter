@@ -18,46 +18,38 @@ jobs:
       with:
         token: ${{ secrets.GITHUB_TOKEN }}
     
-    - name: Setup Node.js
-      uses: actions/setup-node@v3
-      with:
-        node-version: '18'
-    
     - name: Sync documentation files
+      shell: bash
       run: |
         echo "Syncing documentation from android/ to root..."
-        
-        # Copy README with header
-        echo "<!-- This file is auto-generated from android/README.md. Do not edit directly. -->" > README.md
-        echo "<!-- Last synchronized: $(date -u +"%Y-%m-%d %H:%M:%S UTC") -->" >> README.md
-        echo "" >> README.md
-        cat android/README.md >> README.md
-        
-        # Add project structure note
-        cat << 'EOF' >> README.md
 
-## 📁 Project Structure
+        {
+          echo "<!-- This file is auto-generated from android/README.md. Do not edit directly. -->"
+          echo "<!-- Last synchronized: $(date -u +'%Y-%m-%d %H:%M:%S UTC') -->"
+          echo
+          cat android/README.md
+          echo
+          echo "## 📁 Project Structure"
+          echo
+          echo "The main Android application is located in the android/ directory. All development should be done there."
+          echo
+          printf "%s\n" \
+            "smart-sms-filter/" \
+            "├── android/          # Main Android application" \
+            "│   ├── app/         # Application module  " \
+            "│   ├── gradle/      # Gradle wrapper" \
+            "│   └── README.md    # Source documentation (edit this)" \
+            "├── docs/            # Additional documentation" \
+            "├── models/          # ML models (future)" \
+            "├── scripts/         # Utility scripts" \
+            "└── README.md        # Auto-synced from android/README.md"
+          echo
+          echo "> Note: Always edit documentation in android/ directory. Root files are auto-synchronized."
+        } > README.md
 
-The main Android application is located in the android/ directory. All development should be done there.
-
-
-smart-sms-filter/
-├── android/          # Main Android application
-│   ├── app/         # Application module  
-│   ├── gradle/      # Gradle wrapper
-│   └── README.md    # Source documentation (edit this)
-├── docs/            # Additional documentation
-├── models/          # ML models (future)
-├── scripts/         # Utility scripts
-└── README.md        # Auto-synced from android/README.md
-
-
-> **Note:** Always edit documentation in android/ directory. Root files are auto-synchronized.
-EOF
-        
         # Copy CHANGELOG
         cp android/CHANGELOG.md CHANGELOG.md
-        
+
         echo "Documentation sync complete"
     
     - name: Check for changes
