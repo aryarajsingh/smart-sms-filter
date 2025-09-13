@@ -7,9 +7,12 @@ import com.smartsmsfilter.data.model.toEntity
 import com.smartsmsfilter.domain.model.MessageCategory
 import com.smartsmsfilter.domain.model.SmsMessage
 import com.smartsmsfilter.domain.repository.SmsRepository
+import com.smartsmsfilter.data.model.toDomain
+import com.smartsmsfilter.domain.model.toDomain
+import com.smartsmsfilter.domain.model.toEntity
 import com.smartsmsfilter.domain.common.Result
-import com.smartsmsfilter.domain.common.AppException
 import com.smartsmsfilter.domain.common.suspendResultOf
+import com.smartsmsfilter.domain.common.AppException
 import androidx.room.withTransaction
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
@@ -291,6 +294,65 @@ class SmsRepositoryImpl @Inject constructor(
             dao.getMessageById(messageId)?.toDomain()
         } catch (e: Exception) {
             null
+        }
+    }
+    
+    // Starred messages implementation
+    override suspend fun starMessage(starredMessage: com.smartsmsfilter.domain.model.StarredMessage): com.smartsmsfilter.domain.common.Result<Unit> = com.smartsmsfilter.domain.common.suspendResultOf {
+        try {
+            database.starredMessageDao().insertStarredMessage(starredMessage.toEntity())
+        } catch (e: Exception) {
+            throw com.smartsmsfilter.domain.common.AppException.DatabaseError("starMessage", e)
+        }
+    }
+    
+    override suspend fun unstarMessage(messageId: Long): com.smartsmsfilter.domain.common.Result<Unit> = com.smartsmsfilter.domain.common.suspendResultOf {
+        try {
+            database.starredMessageDao().unstarMessage(messageId)
+        } catch (e: Exception) {
+            throw com.smartsmsfilter.domain.common.AppException.DatabaseError("unstarMessage", e)
+        }
+    }
+    
+    override suspend fun isMessageStarred(messageId: Long): Boolean {
+        return try {
+            database.starredMessageDao().isMessageStarred(messageId)
+        } catch (e: Exception) {
+            false
+        }
+    }
+    
+    override fun getAllStarredMessages(): Flow<List<com.smartsmsfilter.domain.model.StarredMessage>> {
+        return database.starredMessageDao().getAllStarredMessages().map { entities ->
+            entities.map { entity -> entity.toDomain() }
+        }
+    }
+    
+    override fun getStarredMessagesBySender(): Flow<List<com.smartsmsfilter.domain.model.StarredSenderGroup>> {
+        return database.starredMessageDao().getStarredMessagesBySender().map { summaries ->
+            summaries.map { summary ->
+                com.smartsmsfilter.domain.model.StarredSenderGroup(
+                    sender = summary.sender,
+                    senderName = summary.senderName,
+                    starredMessages = emptyList(), // Will be loaded separately when needed
+                    messageCount = summary.messageCount,
+                    lastStarredAt = java.util.Date(summary.lastStarredAt)
+                )
+            }
+        }
+    }
+    
+    override fun getStarredMessagesForSender(sender: String): Flow<List<com.smartsmsfilter.domain.model.StarredMessage>> {
+        return database.starredMessageDao().getStarredMessagesForSender(sender).map { entities ->
+            entities.map { entity -> entity.toDomain() }
+        }
+    }
+    
+    override suspend fun getStarredMessageCount(): Int {
+        return try {
+            database.starredMessageDao().getStarredMessageCount()
+        } catch (e: Exception) {
+            0
         }
     }
 }

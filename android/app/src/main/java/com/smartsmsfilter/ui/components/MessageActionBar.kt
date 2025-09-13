@@ -24,12 +24,12 @@ import com.smartsmsfilter.ui.theme.IOSSpacing
 fun MessageActionBar(
     visible: Boolean,
     selectedCount: Int,
-    onArchiveClick: () -> Unit,
+    onMoveToSpamClick: () -> Unit,
     onDeleteClick: () -> Unit,
-    onMarkImportantClick: () -> Unit,
-    onMoveCategoryClick: (MessageCategory) -> Unit,
     onClearSelection: () -> Unit,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    onMoveToImportantClick: (() -> Unit)? = null,
+    showMoveToImportant: Boolean = false
 ) {
     AnimatedVisibility(
         visible = visible,
@@ -78,79 +78,57 @@ fun MessageActionBar(
                     horizontalArrangement = Arrangement.spacedBy(IOSSpacing.small),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    // Archive button
-                    IconButton(onClick = onArchiveClick) {
-                        Icon(
-                            imageVector = Icons.Default.Archive,
-                            contentDescription = "Archive",
-                            tint = MaterialTheme.colorScheme.primary
-                        )
-                    }
-                    
-                    // Important button
-                    IconButton(onClick = onMarkImportantClick) {
-                        Icon(
-                            imageVector = Icons.Default.Star,
-                            contentDescription = "Mark Important",
-                            tint = MaterialTheme.colorScheme.primary
-                        )
-                    }
-                    
-                    // Category dropdown menu
-                    var showCategoryMenu by remember { mutableStateOf(false) }
-                    Box {
-                        IconButton(onClick = { showCategoryMenu = true }) {
-                            Icon(
-                                imageVector = Icons.Default.Category,
-                                contentDescription = "Change Category",
-                                tint = MaterialTheme.colorScheme.primary
+                    // Move to Important button (Review screen only)
+                    if (showMoveToImportant && onMoveToImportantClick != null) {
+                        FilledTonalButton(
+                            onClick = onMoveToImportantClick,
+                            colors = ButtonDefaults.filledTonalButtonColors(
+                                containerColor = MaterialTheme.colorScheme.primaryContainer,
+                                contentColor = MaterialTheme.colorScheme.onPrimaryContainer
                             )
-                        }
-                        
-                        DropdownMenu(
-                            expanded = showCategoryMenu,
-                            onDismissRequest = { showCategoryMenu = false }
                         ) {
-                            DropdownMenuItem(
-                                text = { Text("Move to Inbox") },
-                                onClick = {
-                                    onMoveCategoryClick(MessageCategory.INBOX)
-                                    showCategoryMenu = false
-                                },
-                                leadingIcon = {
-                                    Icon(Icons.Default.Inbox, contentDescription = null)
-                                }
+                            Icon(
+                                imageVector = Icons.Default.CheckCircle,
+                                contentDescription = null,
+                                modifier = Modifier.size(16.dp)
                             )
-                            DropdownMenuItem(
-                                text = { Text("Move to Spam") },
-                                onClick = {
-                                    onMoveCategoryClick(MessageCategory.SPAM)
-                                    showCategoryMenu = false
-                                },
-                                leadingIcon = {
-                                    Icon(Icons.Default.Block, contentDescription = null)
-                                }
-                            )
-                            DropdownMenuItem(
-                                text = { Text("Needs Review") },
-                                onClick = {
-                                    onMoveCategoryClick(MessageCategory.NEEDS_REVIEW)
-                                    showCategoryMenu = false
-                                },
-                                leadingIcon = {
-                                    Icon(Icons.Default.QuestionMark, contentDescription = null)
-                                }
-                            )
+                            Spacer(modifier = Modifier.width(4.dp))
+                            Text("Important", style = MaterialTheme.typography.labelMedium)
                         }
+                    }
+                    
+                    // Move to Spam button
+                    FilledTonalButton(
+                        onClick = onMoveToSpamClick,
+                        colors = ButtonDefaults.filledTonalButtonColors(
+                            containerColor = MaterialTheme.colorScheme.errorContainer,
+                            contentColor = MaterialTheme.colorScheme.onErrorContainer
+                        )
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Block,
+                            contentDescription = null,
+                            modifier = Modifier.size(16.dp)
+                        )
+                        Spacer(modifier = Modifier.width(4.dp))
+                        Text("Spam", style = MaterialTheme.typography.labelMedium)
                     }
                     
                     // Delete button
-                    IconButton(onClick = onDeleteClick) {
+                    FilledTonalButton(
+                        onClick = onDeleteClick,
+                        colors = ButtonDefaults.filledTonalButtonColors(
+                            containerColor = MaterialTheme.colorScheme.error,
+                            contentColor = MaterialTheme.colorScheme.onError
+                        )
+                    ) {
                         Icon(
                             imageVector = Icons.Default.Delete,
-                            contentDescription = "Delete",
-                            tint = MaterialTheme.colorScheme.error
+                            contentDescription = null,
+                            modifier = Modifier.size(16.dp)
                         )
+                        Spacer(modifier = Modifier.width(4.dp))
+                        Text("Delete", style = MaterialTheme.typography.labelMedium)
                     }
                 }
             }

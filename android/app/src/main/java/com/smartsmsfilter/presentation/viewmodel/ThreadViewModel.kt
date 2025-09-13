@@ -7,7 +7,11 @@ import com.smartsmsfilter.data.sms.SmsSenderManager
 import com.smartsmsfilter.data.sms.SmsInfo
 import com.smartsmsfilter.domain.model.SmsMessage
 import com.smartsmsfilter.domain.model.MessageCategory
+import com.smartsmsfilter.domain.model.StarredMessage
 import com.smartsmsfilter.domain.repository.SmsRepository
+import com.smartsmsfilter.domain.usecase.ToggleMessageStarUseCase
+import com.smartsmsfilter.domain.usecase.GetStarredMessagesUseCase
+import com.smartsmsfilter.domain.usecase.DeleteMessageUseCase
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -20,7 +24,10 @@ import javax.inject.Inject
 class ThreadViewModel @Inject constructor(
     private val smsRepository: SmsRepository,
     private val contactManager: ContactManager,
-    private val smsSenderManager: SmsSenderManager
+    private val smsSenderManager: SmsSenderManager,
+    private val toggleMessageStarUseCase: ToggleMessageStarUseCase,
+    private val getStarredMessagesUseCase: GetStarredMessagesUseCase,
+    private val deleteMessageUseCase: DeleteMessageUseCase
 ) : ViewModel() {
 
     private val _messages = MutableStateFlow<List<SmsMessage>>(emptyList())
@@ -125,6 +132,65 @@ onSuccess = { _ ->
     
     fun clearError() {
         _uiState.value = _uiState.value.copy(error = null)
+    }
+    
+    // Starred message functionality
+    fun toggleMessageStar(message: SmsMessage) {
+        viewModelScope.launch {
+            try {
+                val result = toggleMessageStarUseCase(message)
+                result.fold(
+                    onSuccess = { isNowStarred ->
+                        _uiState.value = _uiState.value.copy(
+                            message = if (isNowStarred) "Message starred" else "Message unstarred"
+                        )
+                    },
+                    onFailure = { error ->
+                        _uiState.value = _uiState.value.copy(
+                            error = "Failed to toggle star: ${error.message}"
+                        )
+                    }
+                )
+            } catch (e: Exception) {
+                _uiState.value = _uiState.value.copy(
+                    error = "Failed to toggle star: ${e.message}"
+                )
+            }
+        }
+    }
+    
+    // Delete individual message
+    fun deleteMessage(messageId: Long) {
+        viewModelScope.launch {
+            try {
+                val result = deleteMessageUseCase(messageId)
+                result.fold(
+                    onSuccess = {
+                        _uiState.value = _uiState.value.copy(
+                            message = "Message deleted"
+                        )
+                    },
+                    onFailure = { error ->
+                        _uiState.value = _uiState.value.copy(
+                            error = "Failed to delete: ${error.message}"
+                        )
+                    }
+                )
+            } catch (e: Exception) {
+                _uiState.value = _uiState.value.copy(
+                    error = "Failed to delete message: ${e.message}"
+                )
+            }
+        }
+    }
+    
+    // Check if a message is starred
+    suspend fun isMessageStarred(messageId: Long): Boolean {
+        return try {
+            getStarredMessagesUseCase.isMessageStarred(messageId)
+        } catch (e: Exception) {
+            false
+        }
     }
 }
 

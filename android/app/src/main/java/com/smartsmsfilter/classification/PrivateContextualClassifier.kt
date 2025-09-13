@@ -55,7 +55,8 @@ class PrivateContextualClassifier @Inject constructor(
      */
     fun classifyWithContext(
         message: SmsMessage,
-        recentMessages: List<SmsMessage> = emptyList()
+        recentMessages: List<SmsMessage> = emptyList(),
+        updateContext: Boolean = true  // Allow disabling context updates for explanation queries
     ): MessageClassification {
         val preferences = runBlocking { preferencesFlow.first() }
         
@@ -67,8 +68,10 @@ class PrivateContextualClassifier @Inject constructor(
         val confidence = calculateContextualConfidence(message, context, category)
         val reasons = generateReasons(message, context, category)
         
-        // Update local context (memory only, cleared on app restart)
-        updateLocalContext(message, category)
+        // Only update local context if this is a real classification, not an explanation query
+        if (updateContext) {
+            updateLocalContext(message, category)
+        }
         
         return MessageClassification(
             category = category,

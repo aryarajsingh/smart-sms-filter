@@ -28,6 +28,7 @@ import com.smartsmsfilter.presentation.viewmodel.SmsViewModel
 import com.smartsmsfilter.ui.theme.IOSSpacing
 import com.smartsmsfilter.ui.theme.IOSTypography
 import com.smartsmsfilter.ui.state.MessageTab
+import com.smartsmsfilter.ui.state.isLoading
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.launch
 
@@ -56,6 +57,8 @@ fun UnifiedMessageScreen(
     totalCount: Int? = null
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
+    val mainLoadingState by viewModel.mainLoadingState.collectAsStateWithLifecycle()
+    val isAnyOperationLoading by viewModel.isAnyOperationLoading.collectAsStateWithLifecycle()
     val snackbarHostState = remember { SnackbarHostState() }
     var showWhyDialog by remember { mutableStateOf(false) }
     var whyReasons by remember { mutableStateOf<List<String>>(emptyList()) }
@@ -71,9 +74,6 @@ fun UnifiedMessageScreen(
     
     // Dialog states
     var showDeleteDialog by remember { mutableStateOf(false) }
-    var showArchiveDialog by remember { mutableStateOf(false) }
-    var showCategoryDialog by remember { mutableStateOf(false) }
-    var targetCategory by remember { mutableStateOf<MessageCategory?>(null) }
     
     val scope = rememberCoroutineScope()
 
@@ -85,15 +85,15 @@ fun UnifiedMessageScreen(
         MessageActionBar(
             visible = isSelectionMode,
             selectedCount = selectedCount,
-            onArchiveClick = { showArchiveDialog = true },
+            onMoveToSpamClick = { 
+                viewModel.moveSelectedToCategory(tab, MessageCategory.SPAM)
+            },
             onDeleteClick = { showDeleteDialog = true },
-            onMarkImportantClick = { viewModel.markSelectedAsImportant(tab) },
-            onMoveCategoryClick = if (enableCategoryChange) { category ->
-                android.util.Log.d("UnifiedMessageScreen", "Category change clicked: $category")
-                targetCategory = category
-                showCategoryDialog = true
-            } else { { _ -> } },
-            onClearSelection = { viewModel.clearSelection(tab) }
+            onClearSelection = { viewModel.clearSelection(tab) },
+            onMoveToImportantClick = if (tab == MessageTab.REVIEW) {
+                { viewModel.moveSelectedToCategory(tab, MessageCategory.INBOX) }
+            } else null,
+            showMoveToImportant = tab == MessageTab.REVIEW
         )
         
         // Premium iOS-style header - consistent across all screens
@@ -154,37 +154,22 @@ fun UnifiedMessageScreen(
                 // Special instruction for Review screen
                 if (screenTitle == "Review" && messages.isNotEmpty() && enableCategoryChange) {
                     Text(
-                        text = "Long-press to select messages, then use the action bar to categorize them as Important or Spam.",
+                        text = "Sort messages: Long-press → Select → Tap Important or Spam",
                         style = IOSTypography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        color = MaterialTheme.colorScheme.primary,
                         modifier = Modifier.padding(top = IOSSpacing.small)
                     )
                 }
             }
         }
         
-        // Content area - unified empty state and message list
-        if (uiState.isLoading) {
-            // Lightweight loading skeletons for premium perceived performance
-            LazyColumn(
-                modifier = Modifier.fillMaxSize(),
-                contentPadding = PaddingValues(
-                    horizontal = IOSSpacing.medium,
-                    vertical = IOSSpacing.small
-                ),
-                verticalArrangement = Arrangement.spacedBy(IOSSpacing.small)
-            ) {
-                items(6) {
-                    Surface(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .height(84.dp),
-                        color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.6f),
-                        shape = MaterialTheme.shapes.medium,
-                        tonalElevation = 1.dp
-                    ) {}
-                }
-            }
+        // Content area - unified empty state and message list with standardized loading
+        if (mainLoadingState.isLoading) {
+            // Use standardized skeleton loader for consistent loading experience
+            StandardizedSkeletonLoader(
+                count = 6,
+                modifier = Modifier.fillMaxSize()
+            )
         } else if (messages.isEmpty()) {
             // Consistent empty state design
             Box(
@@ -270,6 +255,21 @@ fun UnifiedMessageScreen(
     }
     }
     
+    // Show error display if there's an error
+    uiState.error?.let { error ->
+        LaunchedEffect(error) {
+            val result = snackbarHostState.showSnackbar(
+                message = error.message,
+                actionLabel = error.actionLabel,
+                duration = if (error.canRetry) SnackbarDuration.Long else SnackbarDuration.Short
+            )
+            if (result == SnackbarResult.ActionPerformed && error.canRetry) {
+                error.onAction?.invoke()
+            }
+            viewModel.clearError()
+        }
+    }
+    
     // Show snackbar messages with Undo capability
     uiState.message?.let { message ->
         LaunchedEffect(message) {
@@ -284,19 +284,12 @@ fun UnifiedMessageScreen(
         }
     }
     
-    // Unified confirmation dialogs - consistent across all screens
+    // Delete confirmation dialog
     DeleteConfirmationDialog(
         showDialog = showDeleteDialog,
         messageCount = selectedCount,
         onConfirm = { viewModel.deleteSelectedMessages(tab) },
         onDismiss = { showDeleteDialog = false }
-    )
-    
-    ArchiveConfirmationDialog(
-        showDialog = showArchiveDialog,
-        messageCount = selectedCount,
-        onConfirm = { viewModel.archiveSelectedMessages(tab) },
-        onDismiss = { showArchiveDialog = false }
     )
     
     // Compact "Why?" dialog
@@ -358,20 +351,16 @@ AlertDialog(
             }
         )
     }
-
-    // Category change dialog - only for Review screen
-    if (enableCategoryChange) {
-        targetCategory?.let { category ->
-            CategoryChangeConfirmationDialog(
-                showDialog = showCategoryDialog,
-                messageCount = selectedCount,
-                targetCategory = category.displayName(),
-                onConfirm = { viewModel.moveSelectedToCategory(tab, category) },
-                onDismiss = {
-                    showCategoryDialog = false
-                    targetCategory = null
-                }
+    
+    // Loading overlay for bulk operations
+    Box(modifier = Modifier.fillMaxSize()) {
+        if (isAnyOperationLoading) {
+            StandardizedLoadingOverlay(
+                loadingState = mainLoadingState,
+                onCancel = null,
+                modifier = Modifier.fillMaxSize()
             )
         }
     }
+
 }

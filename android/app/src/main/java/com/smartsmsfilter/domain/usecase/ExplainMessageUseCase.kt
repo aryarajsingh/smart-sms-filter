@@ -42,8 +42,9 @@ class ExplainMessageUseCase @Inject constructor(
         if (isOtp) reasons += "OTP detected"
 
         // Contextual reasons (on-demand, not persisted)
+        // IMPORTANT: Set updateContext=false to prevent explanation queries from modifying sender history
         val recent = try { repository.getMessagesByAddress(message.sender).first() } catch (_: Exception) { emptyList() }
-        val contextualResult = contextual.classifyWithContext(message, recent)
+        val contextualResult = contextual.classifyWithContext(message, recent, updateContext = false)
         contextualResult.reasons.forEach { r -> if (r.isNotBlank() && r !in reasons) reasons += r }
 
         // Map to human-friendly, deduped, and ordered copy

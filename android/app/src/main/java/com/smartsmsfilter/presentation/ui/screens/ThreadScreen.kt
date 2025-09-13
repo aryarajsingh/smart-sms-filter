@@ -23,10 +23,14 @@ import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.compose.ui.platform.LocalClipboardManager
+import androidx.compose.ui.text.AnnotatedString
 import com.smartsmsfilter.domain.model.SmsMessage
 import com.smartsmsfilter.presentation.viewmodel.ThreadViewModel
 import com.smartsmsfilter.ui.components.PremiumMessageBubble
 import com.smartsmsfilter.ui.components.PremiumComposerBar
+import com.smartsmsfilter.ui.components.MessageActionBottomSheet
+import kotlinx.coroutines.launch
 import com.smartsmsfilter.ui.theme.*
 import java.text.SimpleDateFormat
 import java.util.*
@@ -41,9 +45,26 @@ fun ThreadScreen(
     val messages by viewModel.messages.collectAsStateWithLifecycle()
     val contactName by viewModel.contactName.collectAsStateWithLifecycle()
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
+    val scope = rememberCoroutineScope()
+    val clipboardManager = LocalClipboardManager.current
+    
+    // State for message actions bottom sheet
+    var selectedMessage by remember { mutableStateOf<SmsMessage?>(null) }
+    var showMessageActions by remember { mutableStateOf(false) }
+    var starredMessageIds by remember { mutableStateOf(setOf<Long>()) }
     
     LaunchedEffect(address) {
         viewModel.loadThread(address)
+    }
+    
+    // Load starred status for messages
+    LaunchedEffect(messages) {
+        scope.launch {
+            val starredIds = messages.mapNotNull { message ->
+                if (viewModel.isMessageStarred(message.id)) message.id else null
+            }.toSet()
+            starredMessageIds = starredIds
+        }
     }
     
     // Clear message status after sending
@@ -97,6 +118,11 @@ Icon(imageVector = Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Ba
             ) { message ->
                 PremiumMessageBubble(
                     message = message,
+                    isStarred = starredMessageIds.contains(message.id),
+                    onLongPress = { selectedMsg ->
+                        selectedMessage = selectedMsg
+                        showMessageActions = true
+                    },
                     modifier = Modifier.padding(horizontal = PremiumSpacing.Small)
                 )
             }
@@ -110,6 +136,46 @@ Icon(imageVector = Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Ba
             isSending = uiState.isSending,
             placeholder = "Type a message"
         )
+    }
+    
+    // Message action bottom sheet
+    selectedMessage?.let { message ->
+        if (showMessageActions) {
+            MessageActionBottomSheet(
+                message = message,
+                isStarred = starredMessageIds.contains(message.id),
+                onStarToggle = {
+                    viewModel.toggleMessageStar(message)
+                    // Update starred status immediately
+                    starredMessageIds = if (starredMessageIds.contains(message.id)) {
+                        starredMessageIds - message.id
+                    } else {
+                        starredMessageIds + message.id
+                    }
+                },
+                onDelete = {
+                    viewModel.deleteMessage(message.id)
+                    // Remove from starred if it was starred
+                    starredMessageIds = starredMessageIds - message.id
+                },
+                onDismiss = {
+                    showMessageActions = false
+                    selectedMessage = null
+                },
+                onCopy = { text ->
+                    clipboardManager.setText(AnnotatedString(text))
+                }
+            )
+        }
+    }
+    
+    // Show snackbar for messages
+    uiState.message?.let { message ->
+        LaunchedEffect(message) {
+            // Auto-clear message after showing
+            kotlinx.coroutines.delay(2000)
+            viewModel.clearMessage()
+        }
     }
 }
 

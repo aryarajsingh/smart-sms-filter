@@ -12,8 +12,15 @@ import com.smartsmsfilter.domain.usecase.MessageManagementUseCase
 import com.smartsmsfilter.domain.repository.SmsRepository
 import com.smartsmsfilter.domain.common.Result
 import com.smartsmsfilter.domain.common.userMessage
+import com.smartsmsfilter.domain.common.UiError
+import com.smartsmsfilter.domain.common.toUiError
 import com.smartsmsfilter.ui.state.MessageSelectionState
 import com.smartsmsfilter.ui.state.MessageTab
+import com.smartsmsfilter.ui.state.LoadingState
+import com.smartsmsfilter.ui.state.LoadingStateManager
+import com.smartsmsfilter.ui.state.LoadingOperation
+import com.smartsmsfilter.ui.state.executeMainOperation
+import com.smartsmsfilter.ui.state.executeOperation
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
@@ -28,11 +35,18 @@ class SmsViewModel @Inject constructor(
     private val messageManagementUseCase: MessageManagementUseCase,
     private val smsReader: com.smartsmsfilter.data.sms.SmsReader,
     private val smsRepository: SmsRepository,
-    private val explainMessageUseCase: com.smartsmsfilter.domain.usecase.ExplainMessageUseCase
+    private val explainMessageUseCase: com.smartsmsfilter.domain.usecase.ExplainMessageUseCase,
+    private val classificationService: com.smartsmsfilter.domain.classifier.ClassificationService,
+    private val senderLearningUseCase: com.smartsmsfilter.domain.usecase.SenderLearningUseCase
 ) : ViewModel() {
     
     // Undo support
     private var lastOperation: LastOperation? = null
+    
+    // Standardized loading state management
+    private val loadingStateManager = LoadingStateManager()
+    val mainLoadingState = loadingStateManager.mainLoadingState
+    val isAnyOperationLoading = loadingStateManager.isLoading
     
     // Expose a single state object to the UI
     private val _uiState = MutableStateFlow(SmsUiState())
@@ -98,7 +112,7 @@ class SmsViewModel @Inject constructor(
                 },
                 onError = { error ->
                     _uiState.value = _uiState.value.copy(
-                        error = error.userMessage
+                        error = error.toUiError { updateMessageCategory(messageId, category) }
                     )
                 }
             )
@@ -111,7 +125,7 @@ class SmsViewModel @Inject constructor(
             result.fold(
                 onError = { error ->
                     _uiState.value = _uiState.value.copy(
-                        error = error.userMessage
+                        error = error.toUiError { markAsRead(messageId) }
                     )
                 }
             )
@@ -124,6 +138,12 @@ class SmsViewModel @Inject constructor(
     
     fun clearError() {
         _uiState.value = _uiState.value.copy(error = null)
+    }
+    
+    // Retry the action from an error state
+    fun retryFromError() {
+        _uiState.value.error?.onAction?.invoke()
+        clearError()
     }
     
     // Message Selection Actions - now with tab support
@@ -145,8 +165,14 @@ class SmsViewModel @Inject constructor(
         val selectedIds = selectionState.getSelectedMessageIds(tab)
         if (selectedIds.isNotEmpty()) {
             viewModelScope.launch {
-                val result = messageManagementUseCase.archiveMessages(selectedIds)
-                result.fold(
+                val result = loadingStateManager.executeOperation(
+                    key = LoadingStateManager.BULK_OPERATION,
+                    operation = LoadingOperation.ARCHIVING_MESSAGE,
+                    canCancel = false
+                ) {
+                    messageManagementUseCase.archiveMessages(selectedIds)
+                }
+                result?.fold(
                     onSuccess = {
                         selectionState.clearSelection(tab)
                         _uiState.value = _uiState.value.copy(
@@ -155,7 +181,7 @@ class SmsViewModel @Inject constructor(
                     },
                     onError = { error ->
                         _uiState.value = _uiState.value.copy(
-                            error = error.userMessage
+                            error = error.toUiError { archiveSelectedMessages(tab) }
                         )
                     }
                 )
@@ -167,8 +193,14 @@ class SmsViewModel @Inject constructor(
         val selectedIds = selectionState.getSelectedMessageIds(tab)
         if (selectedIds.isNotEmpty()) {
             viewModelScope.launch {
-                val result = messageManagementUseCase.deleteMessages(selectedIds)
-                result.fold(
+                val result = loadingStateManager.executeOperation(
+                    key = LoadingStateManager.BULK_OPERATION,
+                    operation = LoadingOperation.DELETING_MESSAGE,
+                    canCancel = false
+                ) {
+                    messageManagementUseCase.deleteMessages(selectedIds)
+                }
+                result?.fold(
                     onSuccess = {
                         lastOperation = LastOperation(OperationType.Delete, selectedIds, null)
                         selectionState.clearSelection(tab)
@@ -178,7 +210,7 @@ class SmsViewModel @Inject constructor(
                     },
                     onError = { error ->
                         _uiState.value = _uiState.value.copy(
-                            error = error.userMessage
+                            error = error.toUiError { deleteSelectedMessages(tab) }
                         )
                     }
                 )
@@ -186,61 +218,6 @@ class SmsViewModel @Inject constructor(
         }
     }
     
-    fun markSelectedAsImportant(tab: MessageTab) {
-        val selectedIds = selectionState.getSelectedMessageIds(tab)
-        android.util.Log.d("SmsViewModel", "markSelectedAsImportant called with ${selectedIds.size} messages on tab $tab")
-        if (selectedIds.isNotEmpty()) {
-            viewModelScope.launch {
-                // Mark each message as important individually
-                var hasError = false
-                selectedIds.forEach { messageId ->
-                    android.util.Log.d("SmsViewModel", "Marking message $messageId as important")
-                    val result = messageManagementUseCase.markAsImportant(messageId, true)
-                    if (result.isError) {
-                        hasError = true
-                        android.util.Log.e("SmsViewModel", "Error marking message $messageId as important: ${(result as Result.Error).exception.message}")
-                        _uiState.value = _uiState.value.copy(
-                            error = (result as Result.Error).exception.userMessage
-                        )
-                        return@forEach
-                    } else {
-                        android.util.Log.d("SmsViewModel", "Successfully marked message $messageId as important")
-                    }
-                }
-                
-                // If marking as important from SPAM tab, also move messages to INBOX
-                if (!hasError && tab == MessageTab.SPAM) {
-                    android.util.Log.d("SmsViewModel", "Moving spam messages to inbox after marking as important")
-                    val moveResult = messageManagementUseCase.moveToCategoryBatch(selectedIds, MessageCategory.INBOX)
-                    moveResult.fold(
-                        onSuccess = {
-                            android.util.Log.d("SmsViewModel", "Successfully moved ${selectedIds.size} messages from SPAM to INBOX")
-                            selectionState.clearSelection(tab)
-                            _uiState.value = _uiState.value.copy(
-                                message = "${selectedIds.size} message(s) marked as important and moved to inbox"
-                            )
-                        },
-                        onError = { error ->
-                            android.util.Log.e("SmsViewModel", "Error moving messages to inbox after marking important: ${error.message}")
-                            // Still clear selection but show different message
-                            selectionState.clearSelection(tab)
-                            _uiState.value = _uiState.value.copy(
-                                message = "${selectedIds.size} message(s) marked as important (but failed to move to inbox)",
-                                error = error.userMessage
-                            )
-                        }
-                    )
-                } else if (!hasError) {
-                    // For non-spam messages, just show the important message
-                    selectionState.clearSelection(tab)
-                    _uiState.value = _uiState.value.copy(
-                        message = "${selectedIds.size} message(s) marked as important"
-                    )
-                    android.util.Log.d("SmsViewModel", "All ${selectedIds.size} messages marked as important successfully")
-                }
-            }
-        }
-    }
     
     fun moveSelectedToCategory(tab: MessageTab, category: MessageCategory) {
         val selectedIds = selectionState.getSelectedMessageIds(tab)
@@ -250,31 +227,42 @@ class SmsViewModel @Inject constructor(
         if (selectedIds.isNotEmpty()) {
             viewModelScope.launch {
                 android.util.Log.d("SmsViewModel", "Starting batch move operation...")
-                // Capture previous categories for undo
-                val prevMap = mutableMapOf<Long, MessageCategory>()
-                selectedIds.forEach { id ->
-                    try { smsRepository.getMessageById(id)?.let { prevMap[id] = it.category } } catch (_: Exception) {}
-                }
-                val result = messageManagementUseCase.moveToCategoryBatch(selectedIds, category)
-                result.fold(
-                    onSuccess = {
-                        android.util.Log.d("SmsViewModel", "Batch move successful, clearing selection")
-                        lastOperation = LastOperation(OperationType.MoveCategory, selectedIds, prevMap)
-                        selectionState.clearSelection(tab)
-                        // Force refresh of message counts after batch move
-                        refreshMessageCounts()
-                        _uiState.value = _uiState.value.copy(
-                            message = "${selectedIds.size} message(s) moved to ${category.name.lowercase()}"
-                        )
-                        android.util.Log.d("SmsViewModel", "Successfully moved ${selectedIds.size} messages to $category")
-                    },
-                    onError = { error ->
-                        android.util.Log.e("SmsViewModel", "Error in batch move operation: ${error.message}", error)
-                        _uiState.value = _uiState.value.copy(
-                            error = error.userMessage
-                        )
+                
+                val operationResult = loadingStateManager.executeOperation(
+                    key = LoadingStateManager.BULK_OPERATION,
+                    operation = LoadingOperation.MOVING_MESSAGE,
+                    canCancel = false
+                ) {
+                    // Capture previous categories for undo
+                    val prevMap = mutableMapOf<Long, MessageCategory>()
+                    selectedIds.forEach { id ->
+                        try { smsRepository.getMessageById(id)?.let { prevMap[id] = it.category } } catch (_: Exception) {}
                     }
-                )
+                    
+                    val result = messageManagementUseCase.moveToCategoryBatch(selectedIds, category)
+                    Pair(result, prevMap)
+                }
+                operationResult?.let { (result, prevMap) ->
+                    result.fold(
+                        onSuccess = {
+                            android.util.Log.d("SmsViewModel", "Batch move successful, clearing selection")
+                            lastOperation = LastOperation(OperationType.MoveCategory, selectedIds, prevMap)
+                            selectionState.clearSelection(tab)
+                            // Force refresh of message counts after batch move
+                            refreshMessageCounts()
+                            _uiState.value = _uiState.value.copy(
+                                message = "${selectedIds.size} message(s) moved to ${category.name.lowercase()}"
+                            )
+                            android.util.Log.d("SmsViewModel", "Successfully moved ${selectedIds.size} messages to $category")
+                        },
+                        onError = { error ->
+                            android.util.Log.e("SmsViewModel", "Error in batch move operation: ${error.message}", error)
+                            _uiState.value = _uiState.value.copy(
+                                error = error.toUiError { moveSelectedToCategory(tab, category) }
+                            )
+                        }
+                    )
+                }
             }
         } else {
             android.util.Log.w("SmsViewModel", "No messages selected for category move")
@@ -291,7 +279,7 @@ class SmsViewModel @Inject constructor(
                 )
             } catch (e: Exception) {
                 _uiState.value = _uiState.value.copy(
-                    error = "Failed to archive message: ${e.message}"
+                    error = e.toUiError { archiveMessage(messageId) }
                 )
             }
         }
@@ -306,7 +294,7 @@ class SmsViewModel @Inject constructor(
                 )
             } catch (e: Exception) {
                 _uiState.value = _uiState.value.copy(
-                    error = "Failed to delete message: ${e.message}"
+                    error = e.toUiError { deleteMessage(messageId) }
                 )
             }
         }
@@ -364,13 +352,33 @@ class SmsViewModel @Inject constructor(
     // User correction from Why? sheet
     fun correctClassification(messageId: Long, targetCategory: MessageCategory, reasons: List<String>) {
         viewModelScope.launch {
-            // Capture previous category for undo support
-            val prev = smsRepository.getMessageById(messageId)?.category
+            // Capture previous category and message for learning
+            val message = smsRepository.getMessageById(messageId)
+            val prev = message?.category
             val result = updateMessageCategoryUseCase(messageId, targetCategory)
             result.fold(
                 onSuccess = {
                     // Log user feedback audit (non-blocking on UI feel)
                     try { smsRepository.insertUserFeedbackAudit(messageId, targetCategory, reasons) } catch (_: Exception) {}
+                    
+                    // Trigger learning from user correction (best-effort, non-blocking)
+                    message?.let { msg ->
+                        try {
+                            // 1. Learn sender-level patterns for future messages
+                            when (targetCategory) {
+                                MessageCategory.INBOX -> senderLearningUseCase.learnFromInboxMove(msg)
+                                MessageCategory.SPAM -> senderLearningUseCase.learnFromSpamMarking(msg)
+                                MessageCategory.NEEDS_REVIEW -> { /* No specific sender learning for review */ }
+                            }
+                            
+                            // 2. Learn content-based patterns via classification service
+                            classificationService.handleUserCorrection(messageId, targetCategory, reasons.joinToString(", "))
+                        } catch (e: Exception) {
+                            // Learning failures should not break the UI flow
+                            android.util.Log.w("SmsViewModel", "Failed to learn from user correction", e)
+                        }
+                    }
+                    
                     // Prepare undo
                     lastOperation = LastOperation(
                         type = OperationType.MoveCategory,
@@ -383,7 +391,7 @@ class SmsViewModel @Inject constructor(
                 },
                 onError = { error ->
                     _uiState.value = _uiState.value.copy(
-                        error = error.userMessage
+                        error = error.toUiError { correctClassification(messageId, targetCategory, reasons) }
                     )
                 }
             )
@@ -397,8 +405,10 @@ class SmsViewModel @Inject constructor(
     
     private fun loadExistingSmsMessages() {
         viewModelScope.launch {
-            try {
-                _uiState.value = _uiState.value.copy(isLoading = true)
+            val result = loadingStateManager.executeMainOperation(
+                operation = LoadingOperation.LOADING_MESSAGES,
+                canCancel = false
+            ) {
                 // Load a comprehensive set of messages on first open to avoid fragmented threads
                 smsReader.loadAllSmsMessages().collect { messages ->
                     // Save messages to database if they don't exist
@@ -410,11 +420,12 @@ class SmsViewModel @Inject constructor(
                         }
                     }
                 }
-                _uiState.value = _uiState.value.copy(isLoading = false)
-            } catch (e: Exception) {
+            }
+            
+            if (result == null) {
+                // Handle error case
                 _uiState.value = _uiState.value.copy(
-                    error = "Failed to load existing messages: ${e.message}",
-                    isLoading = false
+                    error = Exception("Failed to load messages").toUiError { reloadSmsMessages() }
                 )
             }
         }
@@ -437,6 +448,6 @@ data class SmsUiState(
     val spamTotalCount: Int = 0,
     val reviewUnreadCount: Int = 0,
     val isLoading: Boolean = true, // Start with loading state
-    val error: String? = null,
+    val error: UiError? = null,
     val message: String? = null
 )

@@ -41,69 +41,68 @@ class ClassificationServiceImpl @Inject constructor(
 
         // 1) Fast rule-based category
         val ruleCategory = simple.classifyMessage(message.sender, message.content)
-
-        // 2) Contextual pass with recent messages for this sender
-        val recent = try { repository.getMessagesByAddress(message.sender).first() } catch (_: Exception) { emptyList() }
-        val contextualResult = contextual.classifyWithContext(
-            message.copy(category = ruleCategory),
-            recent
-        )
-
-        // 3) Blend with preference-aware threshold
-        val threshold = when (prefs.filteringMode) {
-            com.smartsmsfilter.data.preferences.FilteringMode.STRICT -> 0.5f
-            com.smartsmsfilter.data.preferences.FilteringMode.MODERATE -> 0.6f
-            com.smartsmsfilter.data.preferences.FilteringMode.LENIENT -> 0.7f
-        }
-        var usedContextual = false
-        var finalCategory = if (contextualResult.confidence >= threshold) {
-            usedContextual = true
-            contextualResult.category
-        } else {
-            ruleCategory
-        }
-
-        // Prepare reasons, merging context with decision reason
-        val reasons = mutableListOf<String>().apply { addAll(contextualResult.reasons) }
-        if (!usedContextual) {
-            reasons.add("Rule-based decision (low context confidence ${"%.2f".format(contextualResult.confidence)})")
-        }
-
-        // OTP guardrail: ensure OTPs never classified as spam
+        
+        // 2) Check for hard overrides first (OTP, sender preferences)
+        val reasons = mutableListOf<String>()
+        var finalCategory = ruleCategory
+        
+        // OTP guardrail: ensure OTPs never classified as spam (highest priority)
         val isOtp = ClassificationConstants.OTP_REGEXES.any { Regex(it, RegexOption.IGNORE_CASE).containsMatchIn(message.content) }
         if (isOtp) {
-            if (finalCategory != MessageCategory.INBOX) {
-                finalCategory = MessageCategory.INBOX
-                if (reasons.none { it.contains("OTP", true) }) reasons.add("OTP detected")
+            finalCategory = MessageCategory.INBOX
+            reasons.add("OTP detected")
+        } else {
+            // Sender preferences override (pinned/auto-spam) - only if not OTP
+            try {
+                val sp = repository.getSenderPreferences(message.sender)
+                if (sp?.pinnedToInbox == true) {
+                    finalCategory = MessageCategory.INBOX
+                    reasons.add("Pinned sender")
+                } else if (sp?.autoSpam == true) {
+                    finalCategory = MessageCategory.SPAM
+                    reasons.add("Sender marked auto-spam")
+                } else if (sp != null) {
+                    // Soft biasing based on reputation scores if no hard override
+                    if (sp.importanceScore >= 0.75f && finalCategory != MessageCategory.SPAM) {
+                        finalCategory = MessageCategory.INBOX
+                        reasons.add("High sender importance")
+                    } else if (sp.spamScore >= 0.75f) {
+                        finalCategory = MessageCategory.SPAM
+                        reasons.add("High sender spam score")
+                    }
+                }
+            } catch (_: Exception) {}
+        }
+        
+        // 3) Only use contextual classification if no hard overrides applied
+        if (reasons.isEmpty()) {
+            // No hard overrides, proceed with contextual analysis
+            val recent = try { repository.getMessagesByAddress(message.sender).first() } catch (_: Exception) { emptyList() }
+            val contextualResult = contextual.classifyWithContext(
+                message.copy(category = ruleCategory),
+                recent
+            )
+            
+            // Blend with preference-aware threshold
+            val threshold = when (prefs.filteringMode) {
+                com.smartsmsfilter.data.preferences.FilteringMode.STRICT -> 0.5f
+                com.smartsmsfilter.data.preferences.FilteringMode.MODERATE -> 0.6f
+                com.smartsmsfilter.data.preferences.FilteringMode.LENIENT -> 0.7f
+            }
+            
+            if (contextualResult.confidence >= threshold) {
+                finalCategory = contextualResult.category
+                reasons.addAll(contextualResult.reasons)
+            } else {
+                // Use rule-based decision
+                finalCategory = ruleCategory
+                reasons.add("Rule-based decision (low context confidence ${"%.2f".format(contextualResult.confidence)})")
             }
         }
-
-        // Sender preferences override (pinned/auto-spam)
-        try {
-            val sp = repository.getSenderPreferences(message.sender)
-            if (sp?.pinnedToInbox == true) {
-                finalCategory = MessageCategory.INBOX
-                reasons.add("Pinned sender")
-            } else if (sp?.autoSpam == true && !isOtp) {
-                finalCategory = MessageCategory.SPAM
-                reasons.add("Sender marked auto-spam")
-            }
-            // Soft biasing based on reputation scores
-            if (sp != null) {
-                if (sp.importanceScore >= 0.75f && finalCategory != MessageCategory.SPAM) {
-                    finalCategory = MessageCategory.INBOX
-                    if (reasons.none { it.contains("importance", true) }) reasons.add("High sender importance")
-                }
-                if (sp.spamScore >= 0.75f && !isOtp) {
-                    finalCategory = MessageCategory.SPAM
-                    if (reasons.none { it.contains("spam score", true) }) reasons.add("High sender spam score")
-                }
-            }
-        } catch (_: Exception) {}
 
         val classification = MessageClassification(
             category = finalCategory,
-            confidence = contextualResult.confidence,
+            confidence = if (reasons.isEmpty()) 1.0f else 0.9f, // High confidence for hard overrides
             reasons = reasons
         )
 
@@ -130,9 +129,9 @@ class ClassificationServiceImpl @Inject constructor(
         emit(ClassificationProgress(processed = 0, total = 0))
     }
 
-/**
-     * Handle user correction by updating the stored category.
-     * Learning hook can be implemented when message payload is available for local adaptation.
+    /**
+     * Handle user correction by updating the stored category and triggering learning.
+     * Integrates with PrivateContextualClassifier for content-based learning.
      */
     override suspend fun handleUserCorrection(
         messageId: Long,
@@ -144,10 +143,21 @@ class ClassificationServiceImpl @Inject constructor(
 
         val prefs = preferencesSource.userPreferences.first()
         if (prefs.enableLearningFromFeedback) {
-            // Try to fetch the message (best-effort: not exposed in repository; rely on caller to supply
-            // or skip providing message content to contextual classifier learning in this pass.)
-            // For now, learning requires original message payload; we cannot fetch by ID here without a method.
-            // So this is a no-op placeholder unless caller provides full message.
+            // Fetch the original message to enable learning from user correction
+            try {
+                val message = repository.getMessageById(messageId)
+                if (message != null) {
+                    // Learn from the user correction for future similar messages
+                    contextual.learnFromUserCorrection(
+                        message = message,
+                        originalCategory = message.category,
+                        correctedCategory = correctedCategory
+                    )
+                }
+            } catch (e: Exception) {
+                // Learning failure should not break the correction flow
+                android.util.Log.w("ClassificationServiceImpl", "Failed to learn from user correction", e)
+            }
         }
     }
 

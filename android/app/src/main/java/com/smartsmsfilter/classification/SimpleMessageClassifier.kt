@@ -14,9 +14,11 @@ import javax.inject.Singleton
 /**
  * Fast, rule-based classifier leveraging onboarding preferences.
  * Keeps logic simple, with OTP and important-type short-circuits.
+ * Integrates with contact manager to trust known contacts.
  */
 class SimpleMessageClassifier @Inject constructor(
-    preferencesSource: com.smartsmsfilter.data.preferences.PreferencesSource
+    preferencesSource: com.smartsmsfilter.data.preferences.PreferencesSource,
+    private val contactManager: com.smartsmsfilter.data.contacts.ContactManager
 ) {
 
     private val preferencesFlow = preferencesSource.userPreferences
@@ -82,14 +84,27 @@ class SimpleMessageClassifier @Inject constructor(
     /**
      * Classify a message based on user preferences from onboarding
      */
-    fun classifyMessage(sender: String, content: String): MessageCategory {
-        return runBlocking {
-            val preferences = preferencesFlow.first()
-            classifyWithPreferences(sender, content, preferences)
-        }
+    suspend fun classifyMessage(sender: String, content: String): MessageCategory {
+        val preferences = preferencesFlow.first()
+        return classifyWithPreferences(sender, content, preferences)
     }
     
-    private fun classifyWithPreferences(
+    /**
+     * Check if sender is a known contact by looking up in phone contacts
+     */
+    private suspend fun isKnownContact(sender: String): Boolean {
+        return try {
+            val contact = contactManager.getContactByPhoneNumber(sender)
+            // If we get a contact back with a real ID (not 0), it's a known contact
+            contact?.id != null && contact.id > 0
+        } catch (e: Exception) {
+            // If contact lookup fails, assume NOT a known contact
+            // We don't want to treat all phone numbers as known contacts
+            false
+        }
+    }
+
+    private suspend fun classifyWithPreferences(
         sender: String, 
         content: String, 
         preferences: com.smartsmsfilter.data.preferences.UserPreferences
@@ -97,14 +112,9 @@ class SimpleMessageClassifier @Inject constructor(
         val contentLower = content.lowercase()
         val senderUpper = sender.uppercase()
 
-        // --- Highest Priority: Explicit Spam Markers ---
-        if (contentLower.contains("airtel warning: spam") || 
-            contentLower.contains("airtel warning : spam") ||
-            contentLower.contains("warning: spam")) {
-            return MessageCategory.SPAM
-        }
+        // === CLASSIFICATION PRIORITY ORDER (HIGHEST TO LOWEST) ===
         
-        // FIRST: Check for explicit spam markers (Airtel Warning: SPAM)
+        // 1. EXPLICIT SPAM WARNINGS - Always block these first
         if (contentLower.contains("airtel warning: spam") || 
             contentLower.contains("airtel warning : spam") ||
             contentLower.contains("warning: spam") ||
@@ -112,24 +122,26 @@ class SimpleMessageClassifier @Inject constructor(
             return MessageCategory.SPAM
         }
         
-        // Always check for trusted senders first (unless marked as spam)
-        if (TRUSTED_SENDERS.any { senderUpper.contains(it) }) {
-            // Even trusted senders can send spam warnings
-            if (!contentLower.contains("warning") && !contentLower.contains("spam")) {
-                return MessageCategory.INBOX
-            }
+        // 2. KNOWN CONTACTS - Always trust people in user's phonebook (unless explicit spam warning above)
+        if (isKnownContact(sender)) {
+            return MessageCategory.INBOX
         }
         
-        // Do NOT blanket block DLT route prefixes like VM-/RM-/VK-; treat neutral and rely on content/reputation
-        // (If future sender reputation exists, consult that here.)
-        
-        // Check user's selected important message types
-        val userImportantTypes = preferences.importantMessageTypes
-        
-        // OTPs - ALWAYS important regardless of preference (align with contextual classifier)
+        // 3. OTP MESSAGES - Always critical for security
         if (isOtp(content)) {
             return MessageCategory.INBOX
         }
+        
+        // 4. TRUSTED SERVICE SENDERS - Known legitimate services
+        if (TRUSTED_SENDERS.any { senderUpper.contains(it) }) {
+            return MessageCategory.INBOX
+        }
+        
+        // 5. USER PREFERENCE CATEGORIES - Messages user wants in inbox
+        val userImportantTypes = preferences.importantMessageTypes
+        
+        // Note: Sender preferences (pinned/auto-spam) are checked in ClassificationServiceImpl
+        // This keeps the rule-based classifier focused on content and the service layer handles user learning
         
         // Banking - check if user considers banking messages important
         if (userImportantTypes.contains(ImportantMessageType.BANKING) && 
@@ -155,13 +167,13 @@ class SimpleMessageClassifier @Inject constructor(
             return MessageCategory.INBOX
         }
         
-        // Personal messages from phone numbers
+        // Personal messages from phone numbers (if user selected this preference)
         if (userImportantTypes.contains(ImportantMessageType.PERSONAL) && 
             isPhoneNumber(sender)) {
             return MessageCategory.INBOX
         }
         
-        // Apply spam filtering based on user's spam tolerance and filtering mode
+        // 6. SPAM DETECTION - Apply content-based spam filtering
         val spamScore = calculateSpamScore(contentLower, senderUpper, content)
         val threshold = getSpamThreshold(preferences.spamTolerance, preferences.filteringMode)
         
@@ -169,7 +181,7 @@ class SimpleMessageClassifier @Inject constructor(
             return MessageCategory.SPAM
         }
         
-        // If we reach here, the message is uncertain
+        // 7. DEFAULT - If no rules match, needs human review
         return MessageCategory.NEEDS_REVIEW
     }
 

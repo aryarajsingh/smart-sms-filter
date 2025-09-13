@@ -340,7 +340,7 @@ fun CategoryBadge(
     modifier: Modifier = Modifier
 ) {
     val (text, color) = when (category) {
-        MessageCategory.INBOX -> "Important" to MaterialTheme.colorScheme.primary
+        MessageCategory.INBOX -> "Inbox" to MaterialTheme.colorScheme.primary
         MessageCategory.SPAM -> "Spam" to MaterialTheme.colorScheme.tertiary
         MessageCategory.NEEDS_REVIEW -> "Review" to MaterialTheme.colorScheme.secondary
     }
@@ -415,8 +415,8 @@ private fun getAvatarColor(sender: String): Color {
 
 private fun getCategoryIcon(category: MessageCategory): ImageVector {
     return when (category) {
-        MessageCategory.INBOX -> Icons.Filled.Star
-        MessageCategory.SPAM -> Icons.Outlined.FilterList
+        MessageCategory.INBOX -> Icons.Default.Inbox
+        MessageCategory.SPAM -> Icons.Default.Block
         MessageCategory.NEEDS_REVIEW -> Icons.Outlined.Help
     }
 }

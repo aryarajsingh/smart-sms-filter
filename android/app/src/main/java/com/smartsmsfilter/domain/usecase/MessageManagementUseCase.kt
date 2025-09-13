@@ -7,6 +7,7 @@ import javax.inject.Inject
 
 /**
  * Use cases for message management operations
+ * Integrates with sender learning to improve future classifications
  */
 class MessageManagementUseCase @Inject constructor(
     private val smsRepository: SmsRepository
@@ -49,9 +50,28 @@ class MessageManagementUseCase @Inject constructor(
     
     /**
      * Move message to a different category (user manual override)
+     * Also triggers sender learning from user behavior
      */
     suspend fun moveToCategory(messageId: Long, category: MessageCategory) {
+        val message = smsRepository.getMessageById(messageId)
         smsRepository.moveToCategory(messageId, category)
+        
+        // Learn from user's category choice
+        if (message != null) {
+            when (category) {
+                MessageCategory.SPAM -> {
+                    // Remove inbox pinning if they marked as spam
+                    smsRepository.setSenderPinnedToInbox(message.sender, false)
+                    // Increase spam score
+                    smsRepository.updateSenderReputation(message.sender, null, 0.8f)
+                }
+                MessageCategory.INBOX -> {
+                    // Give sender slight positive boost
+                    smsRepository.updateSenderReputation(message.sender, 0.7f, null)
+                }
+                MessageCategory.NEEDS_REVIEW -> { /* No learning needed for review */ }
+            }
+        }
     }
     
     /**
@@ -63,7 +83,9 @@ class MessageManagementUseCase @Inject constructor(
     
     /**
      * Mark message as important for learning purposes
+     * Now delegates to the proper ToggleImportanceUseCase
      */
+    @Deprecated("Use ToggleImportanceUseCase instead for proper learning integration")
     suspend fun markAsImportant(messageId: Long, isImportant: Boolean): Result<Unit> {
         return smsRepository.markAsImportant(messageId, isImportant)
     }

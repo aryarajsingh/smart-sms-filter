@@ -2,9 +2,13 @@ package com.smartsmsfilter.ui.components
 
 import androidx.compose.animation.core.*
 import androidx.compose.animation.animateColorAsState
+import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
+import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -14,18 +18,36 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.hapticfeedback.HapticFeedbackType
+import androidx.compose.ui.platform.LocalHapticFeedback
 import com.smartsmsfilter.domain.model.SmsMessage
 import com.smartsmsfilter.ui.theme.*
 import java.text.SimpleDateFormat
 import java.util.*
+import android.text.format.DateUtils
 
+@OptIn(ExperimentalFoundationApi::class)
 @Composable
 fun PremiumMessageBubble(
     message: SmsMessage,
+    isStarred: Boolean = false,
+    onLongPress: ((SmsMessage) -> Unit)? = null,
     modifier: Modifier = Modifier
 ) {
     val isOutgoing = message.isOutgoing
-    val dateFormatter = SimpleDateFormat("MMM dd, HH:mm", Locale.getDefault())
+    // Improved timestamp display
+    val timeText = when {
+        DateUtils.isToday(message.timestamp.time) -> {
+            SimpleDateFormat("HH:mm", Locale.getDefault()).format(message.timestamp)
+        }
+        DateUtils.isToday(message.timestamp.time + DateUtils.DAY_IN_MILLIS) -> {
+            "Yesterday ${SimpleDateFormat("HH:mm", Locale.getDefault()).format(message.timestamp)}"
+        }
+        else -> {
+            SimpleDateFormat("MMM dd, HH:mm", Locale.getDefault()).format(message.timestamp)
+        }
+    }
+    val haptics = LocalHapticFeedback.current
     
     // Use dynamic colors from Material Theme
     val bubbleColor = if (isOutgoing) {
@@ -51,7 +73,19 @@ fun PremiumMessageBubble(
     } else null
     
     Row(
-        modifier = modifier.fillMaxWidth(),
+        modifier = modifier
+            .fillMaxWidth()
+            .then(
+                if (onLongPress != null) {
+                    Modifier.combinedClickable(
+                        onClick = { /* Single tap - reserved for future use */ },
+                        onLongClick = { 
+                            haptics.performHapticFeedback(HapticFeedbackType.LongPress)
+                            onLongPress(message) 
+                        }
+                    )
+                } else Modifier
+            ),
         horizontalArrangement = if (isOutgoing) Arrangement.End else Arrangement.Start
     ) {
         Column(
@@ -78,20 +112,36 @@ fun PremiumMessageBubble(
                     )
                     .padding(PremiumSpacing.MessageBubblePadding)
             ) {
-                Text(
-                    text = message.content,
-                    style = MaterialTheme.typography.bodyMedium.copy(
-                        fontWeight = if (isOutgoing) FontWeight.Medium else FontWeight.Normal
-                    ),
-                    color = textColor
-                )
+                Row(
+                    verticalAlignment = Alignment.Top,
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    Text(
+                        text = message.content,
+                        style = MaterialTheme.typography.bodyMedium.copy(
+                            fontWeight = if (isOutgoing) FontWeight.Medium else FontWeight.Normal
+                        ),
+                        color = textColor,
+                        modifier = Modifier.weight(1f)
+                    )
+                    
+                    // Star indicator for starred messages with consistent gold color
+                    if (isStarred) {
+                        Icon(
+                            imageVector = Icons.Default.Star,
+                            contentDescription = "Starred message",
+                            tint = Color(0xFFFFD700), // Consistent gold color for all contexts
+                            modifier = Modifier.size(16.dp)
+                        )
+                    }
+                }
             }
             
             Spacer(modifier = Modifier.height(4.dp))
             
-            // Timestamp with premium styling
+            // Timestamp with premium styling and relative formatting
             Text(
-                text = dateFormatter.format(message.timestamp),
+                text = timeText,
                 style = MaterialTheme.typography.labelSmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f),
                 modifier = Modifier.padding(horizontal = 4.dp)

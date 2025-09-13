@@ -9,8 +9,8 @@ import android.content.Context
 import com.smartsmsfilter.data.model.SmsMessageEntity
 
 @Database(
-    entities = [SmsMessageEntity::class, SenderPreferencesEntity::class, ClassificationAuditEntity::class],
-    version = 3,
+    entities = [SmsMessageEntity::class, SenderPreferencesEntity::class, ClassificationAuditEntity::class, StarredMessageEntity::class],
+    version = 4,
     exportSchema = false
 )
 abstract class SmsDatabase : RoomDatabase() {
@@ -18,6 +18,7 @@ abstract class SmsDatabase : RoomDatabase() {
     abstract fun smsMessageDao(): SmsMessageDao
     abstract fun senderPreferencesDao(): SenderPreferencesDao
     abstract fun classificationAuditDao(): ClassificationAuditDao
+    abstract fun starredMessageDao(): StarredMessageDao
     
     companion object {
         const val DATABASE_NAME = "sms_filter_database"
@@ -33,6 +34,26 @@ abstract class SmsDatabase : RoomDatabase() {
             }
         }
         
+        private val MIGRATION_3_4 = object : Migration(3, 4) {
+            override fun migrate(database: SupportSQLiteDatabase) {
+                // Create starred_messages table
+                database.execSQL(
+                    """CREATE TABLE starred_messages (
+                        id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
+                        messageId INTEGER NOT NULL,
+                        sender TEXT NOT NULL,
+                        senderName TEXT,
+                        messagePreview TEXT NOT NULL,
+                        starredAt INTEGER NOT NULL,
+                        originalTimestamp INTEGER NOT NULL
+                    )"""
+                )
+                database.execSQL("CREATE INDEX index_starred_messages_sender ON starred_messages(sender)")
+                database.execSQL("CREATE INDEX index_starred_messages_starredAt ON starred_messages(starredAt)")
+                database.execSQL("CREATE UNIQUE INDEX index_starred_messages_messageId ON starred_messages(messageId)")
+            }
+        }
+        
         fun getDatabase(context: Context): SmsDatabase {
             return INSTANCE ?: synchronized(this) {
                 val instance = Room.databaseBuilder(
@@ -40,7 +61,7 @@ abstract class SmsDatabase : RoomDatabase() {
                     SmsDatabase::class.java,
                     DATABASE_NAME
                 )
-                .addMigrations(MIGRATION_2_3)
+                .addMigrations(MIGRATION_2_3, MIGRATION_3_4)
                 .fallbackToDestructiveMigration() // Only as last resort
                 .build()
                 INSTANCE = instance

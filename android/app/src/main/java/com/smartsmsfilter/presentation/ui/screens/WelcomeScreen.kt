@@ -147,9 +147,9 @@ Icon(
             
             Spacer(modifier = Modifier.height(PremiumSpacing.XLarge))
             
-            // Main headline
+            // Main headline - More direct value proposition
             Text(
-                text = "A calmer, smarter SMS inbox",
+                text = "Stop SMS spam forever",
                 style = MaterialTheme.typography.displayMedium.copy(
                     fontWeight = FontWeight.Bold
                 ),
@@ -164,9 +164,9 @@ Icon(
             
             Spacer(modifier = Modifier.height(PremiumSpacing.Medium))
             
-            // Subheadline
+            // Subheadline - Problem + solution clarity
             Text(
-                text = "Smart SMS Filter automatically organizes your messages, so important ones never get lost in spam.",
+                text = "Tired of promotional spam filling your messages? We automatically filter it out while keeping important texts from banks, OTPs, and real people safe.",
                 style = MaterialTheme.typography.titleMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 textAlign = TextAlign.Center,
@@ -188,8 +188,8 @@ Icon(
                 ) {
                     FeatureHighlight(
                         icon = Icons.Filled.AutoAwesome,
-                        title = "Silences spam automatically",
-                        description = "Advanced filtering keeps promotional messages quiet while prioritizing what matters.",
+                        title = "Blocks 95% of spam instantly",
+                        description = "Advanced AI identifies and silences promotional texts, shopping deals, and unwanted marketing messages.",
                         color = MaterialTheme.colorScheme.primary
                     )
                 }
@@ -199,8 +199,8 @@ Icon(
                 ) {
                     FeatureHighlight(
                         icon = Icons.Filled.Speed,
-                        title = "Prioritizes OTPs, banking & real people", 
-                        description = "Important messages from banks, services, and contacts always reach your inbox.",
+                        title = "Never miss important messages", 
+                        description = "Banking alerts, OTP codes, delivery updates, and messages from your contacts always get through.",
                         color = MaterialTheme.colorScheme.secondary
                     )
                 }
@@ -226,23 +226,67 @@ Icon(
                     .padding(vertical = PremiumSpacing.Large),
                 verticalArrangement = Arrangement.spacedBy(PremiumSpacing.Small)
             ) {
-                // Privacy pledge
-                Text(
-                    text = "Privacy first: all processing happens on your device. No data leaves your phone.",
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
+                // Trust building with specific privacy details
+                Surface(
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = MaterialTheme.shapes.medium,
+                    color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.1f),
+                    border = androidx.compose.foundation.BorderStroke(
+                        1.dp,
+                        MaterialTheme.colorScheme.primary.copy(alpha = 0.2f)
+                    )
+                ) {
+                    Row(
+                        modifier = Modifier.padding(16.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(12.dp)
+                    ) {
+                        Icon(
+                            imageVector = Icons.Filled.Lock,
+                            contentDescription = null,
+                            tint = MaterialTheme.colorScheme.primary,
+                            modifier = Modifier.size(24.dp)
+                        )
+                        Text(
+                            text = "🔒 100% private: Your messages stay on your phone. We never see, store, or share your data.",
+                            style = MaterialTheme.typography.bodyMedium.copy(
+                                fontWeight = FontWeight.Medium
+                            ),
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                }
+                
+                Spacer(modifier = Modifier.height(16.dp))
                 
                 Text(
-                    text = "Why we need permissions",
-                    style = MaterialTheme.typography.titleLarge,
+                    text = "Quick setup (2 minutes)",
+                    style = MaterialTheme.typography.titleLarge.copy(
+                        fontWeight = FontWeight.SemiBold
+                    ),
                     color = MaterialTheme.colorScheme.onBackground
                 )
-                Text(
-                    text = "• SMS: to read and organize your messages on-device\n• Contacts: to show names instead of numbers\n• Notifications: to alert you only when it matters",
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
+                
+                Column(
+                    verticalArrangement = Arrangement.spacedBy(8.dp),
+                    modifier = Modifier.padding(top = 8.dp)
+                ) {
+                    PermissionItem(
+                        icon = Icons.Filled.Message,
+                        title = "SMS Access",
+                        description = "Read messages to filter spam (on your device only)"
+                    )
+                    PermissionItem(
+                        icon = Icons.Filled.Person,
+                        title = "Contacts", 
+                        description = "Show friend names instead of phone numbers"
+                    )
+                    PermissionItem(
+                        icon = Icons.Filled.Notifications,
+                        title = "Notifications",
+                        description = "Alert you when important messages arrive"
+                    )
+                }
                 // No inline buttons here; Get Started handles permission prompts.
             }
 
@@ -295,7 +339,11 @@ Icon(
                         verticalAlignment = Alignment.CenterVertically
                     ) {
                         Text(
-                            text = "Get Started",
+                            text = if (hasAllPermissions && isDefaultSms) {
+                                "Enter App"
+                            } else {
+                                "Start Setup"
+                            },
                             style = MaterialTheme.typography.titleMedium.copy(
                                 fontWeight = FontWeight.SemiBold
                             )
@@ -324,6 +372,41 @@ Icon(
                     )
                 }
             }
+        }
+    }
+}
+
+@Composable
+private fun PermissionItem(
+    icon: ImageVector,
+    title: String,
+    description: String,
+    modifier: Modifier = Modifier
+) {
+    Row(
+        modifier = modifier,
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(12.dp)
+    ) {
+        Icon(
+            imageVector = icon,
+            contentDescription = null,
+            tint = MaterialTheme.colorScheme.primary,
+            modifier = Modifier.size(20.dp)
+        )
+        Column {
+            Text(
+                text = title,
+                style = MaterialTheme.typography.bodyMedium.copy(
+                    fontWeight = FontWeight.Medium
+                ),
+                color = MaterialTheme.colorScheme.onBackground
+            )
+            Text(
+                text = description,
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
         }
     }
 }

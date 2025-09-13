@@ -340,7 +340,6 @@ fun SmartSmsFilterApp() {
 
     // Collect the default SMS app status from MainActivity's StateFlow
     val isDefaultSmsApp by mainActivity?.isDefaultSmsApp?.collectAsState() ?: mutableStateOf(false)
-    val hasAllCorePermissions by mainActivity?.hasAllCorePermissions?.collectAsState() ?: mutableStateOf(false)
     val hasSmsCorePermissions by mainActivity?.hasSmsCorePermissions?.collectAsState() ?: mutableStateOf(false)
 
     // Determine start destination based on onboarding status
@@ -496,7 +495,9 @@ fun SmartSmsFilterApp() {
                         }
                     },
                     onLearnMore = {
-                        // TODO: Open website or show info dialog about privacy, features, how it works
+                        // Show an info dialog about app features, privacy, and how it works
+                        // For now, navigate to settings where detailed info is available
+                        navController.navigate(NavRoutes.Settings.route)
                     },
                     onRequestPermissions = { /* Get Started handles permission prompts */ },
                     onRequestDefaultSms = { /* Defer to onboarding dialog to avoid overlap on welcome */ }

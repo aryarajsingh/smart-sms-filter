@@ -28,6 +28,31 @@ All notable changes to this project will be documented in this file.
 
 The format is inspired by Keep a Changelog. Dates are in YYYY-MM-DD.
 
+## [1.3.0] - 2025-01-13
+### ✨ Major Feature: User Learning System
+- **🧠 Smart Learning**: App now learns from your corrections to improve future classifications
+- **🔒 Privacy-First**: All learning happens locally on your device, no data sent anywhere
+- **📚 Dual Learning Approach**: 
+  - **Sender-level learning**: Remembers sender reputation scores in local database
+  - **Content-based learning**: Learns from message patterns in memory-only storage
+- **🎯 User Experience**: Simply correct misclassified messages via "Why?" dialog and the app learns automatically
+- **⚙️ User Control**: Learning can be disabled in app preferences if desired
+
+### 🛠️ Technical Improvements
+- **Enhanced Classification Service**: Integrated PrivateContextualClassifier with user correction feedback
+- **Comprehensive Error Handling**: Improved backup rules and data extraction policies for production
+- **Code Cleanup**: Removed unused code and fixed compiler warnings
+- **Memory Management**: Automatic cleanup of learning data with size limits
+
+### 🔧 Bug Fixes
+- **Backup Configuration**: Updated Android backup rules to properly handle user preferences while excluding sensitive data
+- **Welcome Screen**: Implemented "Learn More" functionality to navigate to app information
+- **Build Warnings**: Fixed unused variable warnings in MainActivity
+
+### 📚 Documentation
+- **USER_LEARNING_SYSTEM.md**: Complete documentation of the learning system architecture and privacy guarantees
+- **Validation**: All existing tests continue to pass with new learning functionality
+
 ## [1.2.2] - 2025-09-12
 ### Major Improvements
 - **🎯 Installation Success**: Fixed "app not installed" issues by resolving Play Protect compatibility problems

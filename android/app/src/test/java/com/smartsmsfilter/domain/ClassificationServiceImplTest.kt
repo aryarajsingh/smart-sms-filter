@@ -5,14 +5,20 @@ import com.smartsmsfilter.data.preferences.UserPreferences
 import com.smartsmsfilter.domain.classifier.impl.ClassificationServiceImpl
 import com.smartsmsfilter.domain.model.MessageCategory
 import com.smartsmsfilter.domain.model.SmsMessage
+import com.smartsmsfilter.domain.model.StarredMessage
+import com.smartsmsfilter.domain.model.StarredSenderGroup
 import com.smartsmsfilter.domain.repository.SmsRepository
 import com.smartsmsfilter.classification.SimpleMessageClassifier
 import com.smartsmsfilter.classification.PrivateContextualClassifier
+import com.smartsmsfilter.data.contacts.ContactManager
+import com.smartsmsfilter.data.contacts.Contact
 import com.smartsmsfilter.data.preferences.PreferencesManager
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.flowOf
+import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertEquals
 import org.junit.Test
+import org.mockito.Mockito.*
 import java.util.Date
 
 class ClassificationServiceImplTest {
@@ -21,6 +27,15 @@ class ClassificationServiceImplTest {
         override val userPreferences = MutableStateFlow(prefs)
     }
 
+    private fun makeMockContactManager(): ContactManager {
+        val mock = mock(ContactManager::class.java)
+        // Default: return unknown contact (id = 0) using runBlocking for suspend function
+        `when`(runBlocking { mock.getContactByPhoneNumber(anyString()) }).thenReturn(
+            Contact(id = 0, name = "Unknown", phoneNumber = "", phoneType = "", photoUri = null, isFrequentContact = false)
+        )
+        return mock
+    }
+    
     private open class FakeRepo : SmsRepository {
         override suspend fun getSenderPreferences(sender: String): com.smartsmsfilter.domain.model.SenderPreferences? = null
         val stored = mutableListOf<SmsMessage>()
@@ -43,7 +58,6 @@ class ClassificationServiceImplTest {
         override suspend fun getUnreadCount() = 0
         override suspend fun getUnreadCountByCategory(category: MessageCategory) = 0
         override fun getMessagesByAddress(address: String) = flowOf(emptyList<SmsMessage>())
-        // already defined above
         override suspend fun setSenderPinnedToInbox(sender: String, pinned: Boolean) = com.smartsmsfilter.domain.common.Result.Success(Unit)
         override suspend fun updateSenderReputation(sender: String, importanceScore: Float?, spamScore: Float?) = com.smartsmsfilter.domain.common.Result.Success(Unit)
         override suspend fun insertClassificationAudit(messageId: Long?, classifier: MessageCategory, category: MessageCategory, confidence: Float, reasons: List<String>) = com.smartsmsfilter.domain.common.Result.Success(Unit)
@@ -51,13 +65,22 @@ class ClassificationServiceImplTest {
         override suspend fun getLatestClassificationReason(messageId: Long): String? = null
         override suspend fun getMessageById(messageId: Long): SmsMessage? = null
         override suspend fun restoreSoftDeletedMessages(messageIds: List<Long>) = com.smartsmsfilter.domain.common.Result.Success(Unit)
+        
+        // Starred messages methods
+        override suspend fun starMessage(starredMessage: StarredMessage) = com.smartsmsfilter.domain.common.Result.Success(Unit)
+        override suspend fun unstarMessage(messageId: Long) = com.smartsmsfilter.domain.common.Result.Success(Unit)
+        override suspend fun isMessageStarred(messageId: Long): Boolean = false
+        override fun getAllStarredMessages() = flowOf(emptyList<StarredMessage>())
+        override fun getStarredMessagesBySender() = flowOf(emptyList<StarredSenderGroup>())
+        override fun getStarredMessagesForSender(sender: String) = flowOf(emptyList<StarredMessage>())
+        override suspend fun getStarredMessageCount(): Int = 0
     }
 
     @Test
     fun blendingThresholdRespectsFilteringMode() {
         val prefs = UserPreferences(filteringMode = FilteringMode.STRICT)
         val prefsSource = FakePrefs(prefs)
-        val simple = SimpleMessageClassifier(prefsSource)
+        val simple = SimpleMessageClassifier(prefsSource, makeMockContactManager())
         val contextual = PrivateContextualClassifier(prefsSource)
         val repo = FakeRepo()
         val svc = ClassificationServiceImpl(simple, contextual, prefsSource, repo)
@@ -77,7 +100,7 @@ class ClassificationServiceImplTest {
     fun pinnedSenderOverrideToInbox() {
         val prefs = UserPreferences(filteringMode = FilteringMode.MODERATE)
         val prefsSource = FakePrefs(prefs)
-        val simple = SimpleMessageClassifier(prefsSource)
+        val simple = SimpleMessageClassifier(prefsSource, makeMockContactManager())
         val contextual = PrivateContextualClassifier(prefsSource)
 
         val repo = object : FakeRepo() {
@@ -101,7 +124,7 @@ class ClassificationServiceImplTest {
     fun autoSpamOverrideToSpam() {
         val prefs = UserPreferences(filteringMode = FilteringMode.LENIENT)
         val prefsSource = FakePrefs(prefs)
-        val simple = SimpleMessageClassifier(prefsSource)
+        val simple = SimpleMessageClassifier(prefsSource, makeMockContactManager())
         val contextual = PrivateContextualClassifier(prefsSource)
 
         val repo = object : FakeRepo() {
@@ -125,7 +148,7 @@ class ClassificationServiceImplTest {
     fun otpForcesInbox() {
         val prefs = UserPreferences(filteringMode = FilteringMode.MODERATE)
         val prefsSource = FakePrefs(prefs)
-        val simple = SimpleMessageClassifier(prefsSource)
+        val simple = SimpleMessageClassifier(prefsSource, makeMockContactManager())
         val contextual = PrivateContextualClassifier(prefsSource)
         val repo = FakeRepo()
         val svc = ClassificationServiceImpl(simple, contextual, prefsSource, repo)
@@ -144,7 +167,7 @@ class ClassificationServiceImplTest {
     fun unknownShortLinkIsSpam() {
         val prefs = UserPreferences(filteringMode = FilteringMode.MODERATE)
         val prefsSource = FakePrefs(prefs)
-        val simple = SimpleMessageClassifier(prefsSource)
+        val simple = SimpleMessageClassifier(prefsSource, makeMockContactManager())
         val contextual = PrivateContextualClassifier(prefsSource)
         val repo = FakeRepo()
         val svc = ClassificationServiceImpl(simple, contextual, prefsSource, repo)
@@ -163,7 +186,7 @@ class ClassificationServiceImplTest {
     fun highImportanceScoreBiasesToInbox() {
         val prefs = UserPreferences(filteringMode = FilteringMode.MODERATE)
         val prefsSource = FakePrefs(prefs)
-        val simple = SimpleMessageClassifier(prefsSource)
+        val simple = SimpleMessageClassifier(prefsSource, makeMockContactManager())
         val contextual = PrivateContextualClassifier(prefsSource)
         val repo = object : FakeRepo() {
             override suspend fun getSenderPreferences(sender: String): com.smartsmsfilter.domain.model.SenderPreferences? {
@@ -187,7 +210,7 @@ class ClassificationServiceImplTest {
     fun highSpamScoreBiasesToSpam() {
         val prefs = UserPreferences(filteringMode = FilteringMode.MODERATE)
         val prefsSource = FakePrefs(prefs)
-        val simple = SimpleMessageClassifier(prefsSource)
+        val simple = SimpleMessageClassifier(prefsSource, makeMockContactManager())
         val contextual = PrivateContextualClassifier(prefsSource)
         val repo = object : FakeRepo() {
             override suspend fun getSenderPreferences(sender: String): com.smartsmsfilter.domain.model.SenderPreferences? {

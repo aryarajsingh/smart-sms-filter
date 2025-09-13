@@ -60,6 +60,15 @@ interface SmsRepository {
     // Message lookups
     suspend fun getMessageById(messageId: Long): SmsMessage?
 
+    // Starred messages
+    suspend fun starMessage(starredMessage: com.smartsmsfilter.domain.model.StarredMessage): Result<Unit>
+    suspend fun unstarMessage(messageId: Long): Result<Unit>
+    suspend fun isMessageStarred(messageId: Long): Boolean
+    fun getAllStarredMessages(): Flow<List<com.smartsmsfilter.domain.model.StarredMessage>>
+    fun getStarredMessagesBySender(): Flow<List<com.smartsmsfilter.domain.model.StarredSenderGroup>>
+    fun getStarredMessagesForSender(sender: String): Flow<List<com.smartsmsfilter.domain.model.StarredMessage>>
+    suspend fun getStarredMessageCount(): Int
+
     // Undo support
     suspend fun restoreSoftDeletedMessages(messageIds: List<Long>): Result<Unit>
 }

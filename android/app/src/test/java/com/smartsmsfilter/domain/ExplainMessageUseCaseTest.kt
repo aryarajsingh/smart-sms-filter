@@ -5,6 +5,8 @@ import com.smartsmsfilter.data.preferences.PreferencesSource
 import com.smartsmsfilter.data.preferences.UserPreferences
 import com.smartsmsfilter.domain.model.MessageCategory
 import com.smartsmsfilter.domain.model.SmsMessage
+import com.smartsmsfilter.domain.model.StarredMessage
+import com.smartsmsfilter.domain.model.StarredSenderGroup
 import com.smartsmsfilter.domain.repository.SmsRepository
 import com.smartsmsfilter.domain.usecase.ExplainMessageUseCase
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -47,6 +49,15 @@ class ExplainMessageUseCaseTest {
         override suspend fun getLatestClassificationReason(messageId: Long): String? = null
         override suspend fun getMessageById(messageId: Long): SmsMessage? = null
         override suspend fun restoreSoftDeletedMessages(messageIds: List<Long>) = com.smartsmsfilter.domain.common.Result.Success(Unit)
+        
+        // Starred messages methods
+        override suspend fun starMessage(starredMessage: StarredMessage) = com.smartsmsfilter.domain.common.Result.Success(Unit)
+        override suspend fun unstarMessage(messageId: Long) = com.smartsmsfilter.domain.common.Result.Success(Unit)
+        override suspend fun isMessageStarred(messageId: Long): Boolean = false
+        override fun getAllStarredMessages() = flowOf(emptyList<StarredMessage>())
+        override fun getStarredMessagesBySender() = flowOf(emptyList<StarredSenderGroup>())
+        override fun getStarredMessagesForSender(sender: String) = flowOf(emptyList<StarredMessage>())
+        override suspend fun getStarredMessageCount(): Int = 0
     }
 
     @Test

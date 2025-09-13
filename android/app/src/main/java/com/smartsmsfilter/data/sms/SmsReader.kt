@@ -85,7 +85,7 @@ class SmsReader @Inject constructor(
         emit(messages.take(limit))
     }.flowOn(Dispatchers.IO)
     
-    private fun loadMessagesFromUri(
+    private suspend fun loadMessagesFromUri(
         uri: Uri, 
         isOutgoing: Boolean, 
         limit: Int = 10000
