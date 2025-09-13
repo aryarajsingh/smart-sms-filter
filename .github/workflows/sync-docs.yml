@@ -38,9 +38,9 @@ jobs:
 
 ## 📁 Project Structure
 
-The main Android application is located in the `android/` directory. All development should be done there.
+The main Android application is located in the android/ directory. All development should be done there.
 
-```
+
 smart-sms-filter/
 ├── android/          # Main Android application
 │   ├── app/         # Application module  
@@ -50,9 +50,9 @@ smart-sms-filter/
 ├── models/          # ML models (future)
 ├── scripts/         # Utility scripts
 └── README.md        # Auto-synced from android/README.md
-```
 
-> **Note:** Always edit documentation in `android/` directory. Root files are auto-synchronized.
+
+> **Note:** Always edit documentation in android/ directory. Root files are auto-synchronized.
 EOF
         
         # Copy CHANGELOG
