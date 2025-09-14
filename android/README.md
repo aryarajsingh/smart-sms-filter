@@ -1,232 +1,157 @@
-# 🚀 Smart SMS Filter
+# Smart SMS Filter
 
-[![Version](https://img.shields.io/badge/version-2.0.1-blue.svg)](CHANGELOG.md)
-[![Platform](https://img.shields.io/badge/platform-Android-green.svg)](https://developer.android.com)
-[![API](https://img.shields.io/badge/API-24%2B-brightgreen.svg)](https://developer.android.com/about/versions/nougat)
-[![Build](https://img.shields.io/badge/build-passing-brightgreen.svg)](BUILD_SUMMARY.md)
-[![Quality](https://img.shields.io/badge/quality-96%25-success.svg)](FINAL_BUG_REPORT.md)
-[![License](https://img.shields.io/badge/license-MIT-orange.svg)](LICENSE)
+An Android SMS management app with intelligent on-device message classification.
 
-<p align="center">
-  <img src="https://img.shields.io/badge/Bugs-ZERO-success?style=for-the-badge" alt="Zero Bugs">
-  <img src="https://img.shields.io/badge/Crashes-ZERO-success?style=for-the-badge" alt="Zero Crashes">
-  <img src="https://img.shields.io/badge/ANR-ZERO-success?style=for-the-badge" alt="Zero ANR">
-  <img src="https://img.shields.io/badge/Privacy-100%25-blue?style=for-the-badge" alt="100% Private">
-</p>
+## Features
 
-<p align="center">
-  <b>The world's most advanced SMS filter that runs 100% on your device.</b><br>
-  Zero bugs. Zero crashes. Zero data collection.
-</p>
+- **Automatic Classification**: Messages are sorted into Inbox, Spam, or Needs Review
+- **Privacy-First**: All processing happens on-device, no data leaves your phone
+- **Learning System**: Adapts to your preferences without storing personal data
+- **Fast**: Classifications in 65ms, contact lookups in <1ms
 
----
+## How It Works
 
-## ✨ What Makes This Special?
+### Classification Engine
 
-**Smart SMS Filter v2.0.1** isn't just another SMS app - it's a **engineering masterpiece** with:
+Our hybrid classification system combines multiple approaches:
 
-- 🎯 **100% Bug-Free**: Every single bug has been found and eliminated
-- ⚡ **Lightning Fast**: Messages classified in just 65ms
-- 🔒 **Completely Private**: All processing on-device, zero cloud dependency
-- 🧠 **Truly Intelligent**: Hybrid ML + rules system that learns from you
-- 🎨 **Beautiful UI**: Smooth 60 FPS with Material You design
-- 💪 **Rock Solid**: Zero crashes, zero ANR, zero memory leaks
+1. **Rule-Based Engine**
+   - Pattern matching for OTPs, banking messages, and known spam patterns
+   - Keyword analysis with weighted scoring
+   - Sender reputation tracking based on user corrections
+   - Contact whitelist - messages from contacts always go to inbox
 
-## 📱 Features
+2. **Machine Learning** (Optional)
+   - TensorFlow Lite model for advanced classification
+   - 4-bit quantized for efficiency
+   - Runs entirely on-device
+   - Located in `app/src/main/assets/mobile_sms_classifier.tflite`
 
-### 🤖 Smart Classification
-Automatically sorts your messages into three intelligent categories:
-- **📥 Inbox**: Important messages, OTPs, banking alerts, contacts
-- **🚫 Spam**: Promotional content and unwanted messages
-- **❓ Review**: Uncertain messages for your decision
+3. **Contextual Analysis**
+   - Time-based patterns (business hours vs off-hours)
+   - Message frequency analysis
+   - Conversation threading
+   - Sender history evaluation
 
-### 🧠 Intelligence That Respects Privacy
-- **OTP Protection**: Never misses verification codes
-- **Banking Priority**: Transaction alerts always visible
-- **Contact Trust**: Friends always reach your inbox
-- **Learning System**: Adapts to your preferences locally
-- **Sender Memory**: Remembers your choices per sender
+The system uses a confidence-based approach:
+- High confidence (>0.8): Direct classification
+- Medium confidence (0.5-0.8): Additional context considered
+- Low confidence (<0.5): Marked for review
 
-### 🎨 Premium User Experience
-- **60 FPS Animations**: Buttery smooth scrolling
-- **Dark Mode**: Beautiful OLED-friendly theme
-- **Material You**: Adapts to your system colors
-- **Instant Search**: Find any message in milliseconds
-- **Batch Operations**: Manage multiple messages easily
+### Architecture
 
-## 🚀 Performance
+```
+app/
+├── classifier/          # Unified classification engine
+│   ├── UnifiedSmartClassifier.kt    # Main orchestrator
+│   ├── RuleEngine.kt                # Pattern matching
+│   └── LearningEngine.kt            # User preference learning
+├── data/               # Data layer
+│   ├── database/       # Room database
+│   ├── contacts/       # Contact management with caching
+│   └── sms/           # SMS operations
+├── domain/            # Business logic
+│   ├── model/         # Data models
+│   └── usecase/       # Use cases
+└── presentation/      # UI layer (Jetpack Compose)
+```
 
-| Metric | Performance | Industry Standard | Improvement |
-|--------|------------|-------------------|-------------|
-| **Classification** | 65ms | 200ms+ | **3x faster** |
-| **Contact Lookup** | <1ms | 50ms+ | **50x faster** |
-| **UI Smoothness** | 60 FPS | 30-45 FPS | **Perfect** |
-| **Memory Usage** | 85 MB | 150MB+ | **43% less** |
-| **APK Size** | 43 MB | 60MB+ | **28% smaller** |
-| **Crash Rate** | 0% | 1-2% | **Perfect** |
+## Installation
 
-## 📥 Installation
-
-### Quick Install (Recommended)
+### Pre-built APK
 ```bash
-# Download latest release
+# Download from releases
 wget https://github.com/aryarajsingh/smart-sms-filter/releases/latest/download/app-release.apk
-
-# Install via ADB
 adb install app-release.apk
 ```
 
 ### Build from Source
 ```bash
-# Clone repository
 git clone https://github.com/aryarajsingh/smart-sms-filter.git
 cd smart-sms-filter/android
-
-# Build release APK
 ./gradlew assembleRelease
-
-# Find APK at
-# app/build/outputs/apk/release/app-release.apk
+# APK will be in app/build/outputs/apk/release/
 ```
 
-## 🏗️ Architecture
+## Requirements
 
-Built with **Clean Architecture + MVVM** for maximum maintainability:
+- Android 7.0+ (API 24)
+- Permissions: SMS, Contacts, Notifications
+- Storage: ~100MB (includes ML model)
 
-```
-app/
-├── 📱 presentation/    # Jetpack Compose UI
-├── 💼 domain/         # Business Logic
-├── 💾 data/           # Database & Repository
-├── 🧠 classifier/     # Unified ML + Rules
-└── 💉 di/             # Dependency Injection
-```
-
-### Tech Stack
-- **Language**: 100% Kotlin
-- **UI**: Jetpack Compose
-- **Database**: Room with SQLite
-- **DI**: Hilt
-- **Async**: Coroutines + Flow
-- **ML**: TensorFlow Lite
-
-## 🔒 Privacy & Security
-
-### Your Data Never Leaves Your Phone
-- ✅ 100% on-device processing
-- ✅ No internet permission required for core features
-- ✅ No analytics or telemetry
-- ✅ No ads or tracking
-- ✅ Open source for transparency
-
-### Security Features
-- 🔐 AES-256 encryption for sensitive data
-- 🛡️ Android Keystore integration
-- 🚦 Rate limiting for SMS operations
-- 🔍 Input validation and sanitization
-
-## 📊 Quality Metrics
-
-| Category | Score | Status |
-|----------|-------|--------|
-| **Stability** | 100% | ✅ Zero crashes |
-| **Performance** | 96% | ✅ Optimized |
-| **Code Quality** | 98% | ✅ Clean |
-| **Test Coverage** | 85% | ✅ Comprehensive |
-| **Security** | 100% | ✅ Hardened |
-| **Overall** | **96%** | **Production Ready** |
-
-## 🛠️ Development
-
-### Requirements
-- Android Studio Hedgehog+
-- Kotlin 1.9+
-- Android SDK 34
-- Gradle 8.0+
+## Development
 
 ### Setup
+1. Clone the repository
+2. Open `android/` folder in Android Studio
+3. Sync Gradle files
+4. Run on device/emulator
+
+### Tech Stack
+- **Language**: Kotlin
+- **UI**: Jetpack Compose
+- **Database**: Room
+- **DI**: Hilt
+- **Async**: Coroutines + Flow
+- **ML**: TensorFlow Lite (optional)
+
+### Key Classes
+
+- `UnifiedSmartClassifier`: Main classification orchestrator
+- `SmsReceiver`: Intercepts incoming messages
+- `SmartNotificationManager`: Handles intelligent notifications
+- `ContactManager`: Manages contact lookups with LRU caching
+- `SmsViewModel`: Primary UI state management
+
+## Performance
+
+| Metric | Value | Details |
+|--------|-------|---------|
+| Classification Speed | 65ms | 3x faster than v1.0 |
+| Contact Lookup | <1ms | LRU cache with 100 entry limit |
+| Memory Usage | 85MB | Including ML model |
+| Database Queries | <10ms | Indexed on sender, timestamp, category |
+| UI Frame Rate | 60 FPS | Optimized LazyColumn with keys |
+
+## Privacy & Security
+
+- **No Network Access**: Core features work offline
+- **No Analytics**: Zero tracking or telemetry
+- **Encrypted Storage**: Sensitive data encrypted with Android Keystore
+- **Open Source**: Full code transparency
+
+## Testing
+
 ```bash
-# Clone the repo
-git clone https://github.com/aryarajsingh/smart-sms-filter.git
-
-# Open in Android Studio
-# File -> Open -> Select the android folder
-
-# Sync and build
-./gradlew build
-```
-
-### Testing
-```bash
-# Run all tests
+# Run unit tests
 ./gradlew test
 
-# Run with coverage
+# Run instrumented tests
+./gradlew connectedAndroidTest
+
+# Generate coverage report
 ./gradlew testDebugUnitTestCoverage
 ```
 
-## 📈 What's New in v2.0.1?
+## Contributing
 
-### 🎯 Complete Overhaul
-- Unified architecture (removed separate ML/Classical flavors)
-- Zero bugs achievement (100% bug-free)
-- 3x performance improvement
-- 50x faster contact resolution
+1. Fork the repository
+2. Create a feature branch
+3. Make your changes
+4. Add tests
+5. Submit a pull request
 
-### 🐛 All Bugs Fixed
-- ✅ Eliminated ALL ANR risks
-- ✅ Fixed all memory leaks
-- ✅ Resolved thread safety issues
-- ✅ Fixed UI performance problems
-- ✅ Android 13+ compatibility
+## Documentation
 
-See [CHANGELOG.md](CHANGELOG.md) for complete details.
+- [Architecture Details](UNIFIED_ARCHITECTURE.md)
+- [Technical Fixes](TECHNICAL_FIXES.md)
+- [Changelog](CHANGELOG.md)
 
-## 📚 Documentation
+## License
 
-- [Technical Architecture](UNIFIED_ARCHITECTURE.md)
-- [Bug Fix Details](TECHNICAL_FIXES.md)
-- [UI Performance](UI_PERFORMANCE_FIXES.md)
-- [Build Guide](BUILD_SUMMARY.md)
-- [Testing Report](FINAL_BUG_REPORT.md)
+MIT License - see [LICENSE](LICENSE) file
 
-## 🤝 Contributing
+## Contact
 
-We welcome contributions! Please see [CONTRIBUTING.md](CONTRIBUTING.md) for guidelines.
-
-### Ways to Contribute
-- 🐛 Report bugs (though you won't find any!)
-- 💡 Suggest features
-- 🌍 Add translations
-- 📝 Improve documentation
-- ⭐ Star the repository!
-
-## 📄 License
-
-This project is licensed under the MIT License - see [LICENSE](LICENSE) for details.
-
-## 🙏 Acknowledgments
-
-- Android Jetpack team for amazing Compose framework
-- TensorFlow team for TFLite
-- All contributors and testers
-- You, for choosing privacy-first software!
-
-## 📞 Support
-
-- 📧 Email: aryarajsingh@example.com
-- 🐛 Issues: [GitHub Issues](https://github.com/aryarajsingh/smart-sms-filter/issues)
-- 💬 Discussions: [GitHub Discussions](https://github.com/aryarajsingh/smart-sms-filter/discussions)
-
----
-
-<p align="center">
-  Made with ❤️ by Aryaraj Singh<br>
-  <b>Star ⭐ this repository if you find it useful!</b>
-</p>
-
-<p align="center">
-  <a href="https://github.com/aryarajsingh/smart-sms-filter/releases/latest">
-    <img src="https://img.shields.io/badge/Download-Latest_Release-blue?style=for-the-badge" alt="Download">
-  </a>
-</p>
+- Issues: [GitHub Issues](https://github.com/aryarajsingh/smart-sms-filter/issues)
+- Email: aryarajsingh@example.com
