@@ -14,7 +14,8 @@ import com.smartsmsfilter.domain.model.MessageCategory
 import com.smartsmsfilter.domain.model.SmsMessage
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.flow.first
-import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 import javax.inject.Inject
 import javax.inject.Singleton
 
@@ -111,14 +112,14 @@ class SmartNotificationManager @Inject constructor(
     /**
      * Show smart notification based on message category and user preferences
      */
-    fun showSmartNotification(message: SmsMessage) {
-        val preferences = runBlocking { preferencesManager.userPreferences.first() }
+    suspend fun showSmartNotification(message: SmsMessage) = withContext(Dispatchers.Main) {
+        val preferences = preferencesManager.userPreferences.first()
         
         // Check if smart notifications are enabled
         if (!preferences.enableSmartNotifications) {
             // Fall back to normal notification
             showBasicNotification(message)
-            return
+            return@withContext
         }
         
         // Determine notification channel and priority based on category
@@ -178,7 +179,7 @@ class SmartNotificationManager @Inject constructor(
     /**
      * Show a basic notification (fallback when smart notifications are disabled)
      */
-    private fun showBasicNotification(message: SmsMessage) {
+    private suspend fun showBasicNotification(message: SmsMessage) {
         showNotification(
             message = message,
             channelId = CHANNEL_NORMAL,
@@ -193,7 +194,7 @@ class SmartNotificationManager @Inject constructor(
      * this method uses a stable notification ID for each conversation, which is
      * generated from a hash of the sender's address.
      */
-    private fun showNotification(
+    private suspend fun showNotification(
         message: SmsMessage,
         channelId: String,
         priority: Int,
@@ -282,19 +283,18 @@ class SmartNotificationManager @Inject constructor(
     /**
      * Get appropriate notification content based on message category
      */
-    private fun getNotificationContent(message: SmsMessage): Pair<String, String> {
-        // Try to get contact name for the sender
-        val senderDisplay = runBlocking {
-            try {
-                val contact = contactManager.getContactByPhoneNumber(message.sender)
-                contact?.name ?: message.sender
-            } catch (e: Exception) {
-                // Fallback to phone number if contact lookup fails
-                message.sender
-            }
+    private suspend fun getNotificationContent(message: SmsMessage): Pair<String, String> = withContext(Dispatchers.IO) {
+        // Try to get contact name for the sender asynchronously to avoid ANR
+        val senderDisplay = try {
+            val contact = contactManager.getContactByPhoneNumber(message.sender)
+            contact?.name ?: formatPhoneNumber(message.sender)
+        } catch (e: Exception) {
+            android.util.Log.e("SmartNotificationManager", "Error getting contact for ${message.sender}", e)
+            // Fallback to phone number if contact lookup fails
+            message.sender
         }
         
-        return when (message.category) {
+        return@withContext when (message.category) {
             MessageCategory.INBOX -> {
                 if (isImportantMessage(message)) {
                     Pair("🔴 Important: $senderDisplay", getTruncatedContent(message.content, 100))
@@ -336,10 +336,12 @@ class SmartNotificationManager @Inject constructor(
     /**
      * Clear all notifications from a specific category
      */
+    @Suppress("UNUSED_PARAMETER")
     fun clearCategoryNotifications(category: MessageCategory) {
-        val notificationManager = NotificationManagerCompat.from(context)
         // In a real implementation, we'd track notification IDs by category
         // For now, this is a placeholder
+        // val notificationManager = NotificationManagerCompat.from(context)
+        // TODO: Implement category-based notification clearing
     }
     
     /**
@@ -357,4 +359,25 @@ class SmartNotificationManager @Inject constructor(
         val vibrate: Boolean,
         val sound: Boolean
     )
+    
+    /**
+     * Format phone number for display when contact name is not available
+     */
+    private fun formatPhoneNumber(phoneNumber: String): String {
+        // Remove all non-digit characters except +
+        val cleaned = phoneNumber.replace(Regex("[^+0-9]"), "")
+        
+        // For Indian numbers, format nicely
+        return when {
+            cleaned.matches(Regex("^\\+91[0-9]{10}$")) -> {
+                // +919876543210 -> +91 98765 43210
+                "${cleaned.substring(0, 3)} ${cleaned.substring(3, 8)} ${cleaned.substring(8)}"
+            }
+            cleaned.matches(Regex("^[6-9][0-9]{9}$")) -> {
+                // 9876543210 -> 98765 43210
+                "${cleaned.substring(0, 5)} ${cleaned.substring(5)}"
+            }
+            else -> phoneNumber // Return as-is for other formats
+        }
+    }
 }

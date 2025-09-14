@@ -149,7 +149,7 @@ class SmsReceiver : BroadcastReceiver() {
                     id = classification.messageId ?: 0L
                 )
 
-                // Notify user based on final category
+                // Notify user based on final category (now a suspend function)
                 notificationManager.showSmartNotification(finalMessage)
                 Log.d(TAG, "Notification sent for category: ${classification.category}")
                 

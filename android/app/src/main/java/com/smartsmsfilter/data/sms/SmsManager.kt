@@ -6,6 +6,10 @@ import android.content.Intent
 import android.telephony.SmsManager
 import android.util.Log
 import kotlinx.coroutines.suspendCancellableCoroutine
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import javax.inject.Inject
 import javax.inject.Singleton
 import kotlin.coroutines.resume
@@ -32,24 +36,19 @@ class SmsSenderManager @Inject constructor(
     suspend fun sendSms(
         phoneNumber: String, 
         message: String
-    ): Result<SmsDeliveryStatus> = suspendCancellableCoroutine { continuation ->
-        
+    ): Result<SmsDeliveryStatus> = withContext(Dispatchers.IO) {
         try {
             Log.d(TAG, "Sending SMS to $phoneNumber")
             
             // Validate inputs
             if (phoneNumber.isBlank() || message.isBlank()) {
-                continuation.resume(Result.failure(IllegalArgumentException("Phone number and message cannot be empty")))
-                return@suspendCancellableCoroutine
+                return@withContext Result.failure(IllegalArgumentException("Phone number and message cannot be empty"))
             }
             
             // Check rate limits
-            kotlinx.coroutines.runBlocking {
-                val (canSend, errorMessage) = rateLimiter.canSendSms(phoneNumber)
-                if (!canSend) {
-                    continuation.resume(Result.failure(IllegalStateException(errorMessage ?: "Rate limit exceeded")))
-                    return@runBlocking
-                }
+            val (canSend, errorMessage) = rateLimiter.canSendSms(phoneNumber)
+            if (!canSend) {
+                return@withContext Result.failure(IllegalStateException(errorMessage ?: "Rate limit exceeded"))
             }
             
             // Create pending intents for delivery tracking
@@ -101,16 +100,14 @@ class SmsSenderManager @Inject constructor(
             }
             
             // Record the SMS for rate limiting
-            kotlinx.coroutines.runBlocking {
-                rateLimiter.recordSmsSent(phoneNumber)
-            }
+            rateLimiter.recordSmsSent(phoneNumber)
             
             // Return success - in a real app, you'd wait for the broadcast receiver
-            continuation.resume(Result.success(SmsDeliveryStatus.SENT))
+            Result.success(SmsDeliveryStatus.SENT)
             
         } catch (e: Exception) {
             Log.e(TAG, "Failed to send SMS", e)
-            continuation.resume(Result.failure(e))
+            Result.failure(e)
         }
     }
     

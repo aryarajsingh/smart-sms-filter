@@ -31,7 +31,7 @@ fun PremiumPullToRefresh(
     modifier: Modifier = Modifier,
     content: @Composable () -> Unit
 ) {
-    var pullDistance by remember { mutableStateOf(0f) }
+    var pullDistance by remember { mutableFloatStateOf(0f) }
     var isReleased by remember { mutableStateOf(false) }
     val density = LocalDensity.current
 

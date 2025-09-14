@@ -214,3 +214,7 @@ android/*.hprof
 # Generated assets and external outputs
 IconKitchen-Output/
 icons-output/
+
+# Build output directories
+android/build-alt/
+android/build-output/

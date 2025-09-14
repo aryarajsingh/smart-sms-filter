@@ -220,14 +220,16 @@ class ClassificationServiceImplTest {
     fun highSpamScoreBiasesToSpam() {
         val prefs = UserPreferences(filteringMode = FilteringMode.MODERATE)
         val prefsSource = FakePrefs(prefs)
-        val simple = SimpleMessageClassifier(prefsSource, makeMockContactManager())
-        val contextual = PrivateContextualClassifier(prefsSource)
+        val classifier = mock(SmsClassifier::class.java)
+        `when`(runBlocking { classifier.classifyMessage(any()) }).thenReturn(
+            MessageClassification(MessageCategory.SPAM, 0.92f, listOf("High spam score"))
+        )
         val repo = object : FakeRepo() {
             override suspend fun getSenderPreferences(sender: String): com.smartsmsfilter.domain.model.SenderPreferences? {
                 return com.smartsmsfilter.domain.model.SenderPreferences(sender = sender, spamScore = 0.9f)
             }
         }
-        val svc = ClassificationServiceImpl(simple, contextual, prefsSource, repo)
+        val svc = ClassificationServiceImpl(classifier, prefsSource, repo)
 
         val message = SmsMessage(
             id = 7L,

@@ -16,6 +16,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.Star
 import androidx.compose.runtime.*
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
@@ -64,11 +65,11 @@ fun UnifiedMessageScreen(
     val mainLoadingState by viewModel.mainLoadingState.collectAsStateWithLifecycle()
     val isAnyOperationLoading by viewModel.isAnyOperationLoading.collectAsStateWithLifecycle()
     val snackbarHostState = remember { SnackbarHostState() }
-    var showWhyDialog by remember { mutableStateOf(false) }
-    var whyReasons by remember { mutableStateOf<List<String>>(emptyList()) }
-    var whyCategory by remember { mutableStateOf<MessageCategory?>(null) }
-    var whyMessageId by remember { mutableStateOf<Long?>(null) }
-    var selectedReasons by remember { mutableStateOf(setOf<String>()) }
+    var showWhyDialog by rememberSaveable { mutableStateOf(false) }
+    var whyReasons by rememberSaveable { mutableStateOf<List<String>>(emptyList()) }
+    var whyCategory by rememberSaveable { mutableStateOf<MessageCategory?>(null) }
+    var whyMessageId by rememberSaveable { mutableStateOf<Long?>(null) }
+    var selectedReasons by rememberSaveable { mutableStateOf(setOf<String>()) }
     
     // Optimize expensive calculations
     val countText = remember(totalCount, unreadCount) {
@@ -86,7 +87,7 @@ fun UnifiedMessageScreen(
     val selectedMessages = tabSelectionState.selectedMessages
     
     // Dialog states
-    var showDeleteDialog by remember { mutableStateOf(false) }
+    var showDeleteDialog by rememberSaveable { mutableStateOf(false) }
     
     val scope = rememberCoroutineScope()
 
@@ -242,12 +243,14 @@ fun UnifiedMessageScreen(
             ) {
                 items(
                     items = listToShow, 
-                    key = { it.id },
+                    key = { message -> message.id },
                     contentType = { "message" } // Help compose optimize
                 ) { message ->
                     SwipeableMessageCard(
                             message = message,
-                            modifier = Modifier,
+                            modifier = Modifier.animateItemPlacement(
+                                animationSpec = tween(durationMillis = 250)
+                            ),
                         onClick = {
                             if (isSelectionMode) {
                                 viewModel.onMessageSelectionToggle(tab, message.id)

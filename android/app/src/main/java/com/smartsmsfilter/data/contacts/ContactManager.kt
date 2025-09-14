@@ -17,6 +17,8 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.flowOn
 import kotlinx.coroutines.flow.catch
+import kotlinx.coroutines.withContext
+import java.util.Collections
 import javax.inject.Inject
 import javax.inject.Singleton
 
@@ -24,9 +26,65 @@ import javax.inject.Singleton
 class ContactManager @Inject constructor(
     private val context: Context
 ) {
+    /**
+     * Thread-safe LRU cache for contact lookups.
+     * Caches up to 100 contacts to improve performance.
+     */
+    private val contactCache = Collections.synchronizedMap(
+        object : LinkedHashMap<String, Contact?>(101, 0.75f, true) {
+            override fun removeEldestEntry(eldest: MutableMap.MutableEntry<String, Contact?>?) = size > 100
+        }
+    )
+    
+    /**
+     * Clear the contact cache. Should be called when contacts are updated.
+     */
+    fun clearCache() {
+        contactCache.clear()
+    }
     
     companion object {
         private const val TAG = "ContactManager"
+        
+        /**
+         * Unified phone number normalization for the entire app.
+         * This is the single source of truth for normalizing phone numbers
+         * for contact lookups and storage.
+         */
+        @JvmStatic
+        fun normalizePhoneNumberForLookup(phoneNumber: String?): String {
+            if (phoneNumber.isNullOrBlank()) return ""
+            
+            val cleaned = phoneNumber.trim()
+            val digitsOnly = cleaned.filter { it.isDigit() }
+            
+            // Handle shortcodes (less than 7 digits)
+            if (digitsOnly.length < 7) {
+                return cleaned.replace(Regex("[^+0-9]"), "")
+            }
+            
+            // For Indian numbers, normalize to 10-digit format
+            // This ensures consistent matching regardless of country code format
+            return when {
+                // International format with +91
+                cleaned.startsWith("+91") && digitsOnly.length >= 10 -> 
+                    digitsOnly.takeLast(10)
+                // Without + but with 91 country code
+                cleaned.startsWith("91") && digitsOnly.length >= 12 -> 
+                    digitsOnly.takeLast(10)
+                // With 0091 prefix
+                cleaned.startsWith("0091") && digitsOnly.length >= 14 -> 
+                    digitsOnly.takeLast(10)
+                // Starting with 0 (common in some regions)
+                cleaned.startsWith("0") && digitsOnly.length == 11 -> 
+                    digitsOnly.takeLast(10)
+                // Already 10 digits or more - take last 10
+                digitsOnly.length >= 10 -> 
+                    digitsOnly.takeLast(10)
+                // Other formats - clean and return
+                else -> cleaned.replace(Regex("[^+0-9]"), "")
+            }
+        }
     }
     
     /**
@@ -117,6 +175,13 @@ class ContactManager @Inject constructor(
             return@flow
         }
         
+        // Check permission first
+        if (!hasContactPermission()) {
+            Log.w(TAG, "No contact permission for search")
+            emit(emptyList())
+            return@flow
+        }
+        
         val contacts = mutableListOf<Contact>()
         
         try {
@@ -175,9 +240,23 @@ class ContactManager @Inject constructor(
     }.flowOn(Dispatchers.IO)
     
     /**
-     * Get contact by phone number
+     * Get contact by phone number - returns null if not found
      */
-    suspend fun getContactByPhoneNumber(phoneNumber: String): Contact? {
+    suspend fun getContactByPhoneNumber(phoneNumber: String): Contact? = withContext(Dispatchers.IO) {
+        // Check cache first
+        val cacheKey = normalizePhoneNumberForLookup(phoneNumber)
+        contactCache[cacheKey]?.let { 
+            Log.d(TAG, "Contact found in cache for: $cacheKey")
+            return@withContext it 
+        }
+        
+        // Check permission
+        if (!hasContactPermission()) {
+            Log.w(TAG, "No contact permission for lookup")
+            contactCache[cacheKey] = null // Cache the negative result
+            return@withContext null
+        }
+        
         try {
             val original = phoneNumber
             val normalized = normalizePhoneNumber(original)
@@ -204,15 +283,23 @@ class ContactManager @Inject constructor(
                     val numberIndex = c.getColumnIndex(ContactsContract.CommonDataKinds.Phone.NUMBER)
                     val typeIndex = c.getColumnIndex(ContactsContract.CommonDataKinds.Phone.TYPE)
                     val photoIndex = c.getColumnIndex(ContactsContract.CommonDataKinds.Phone.PHOTO_URI)
+                    
+                    // Check for valid column indices
+                    if (contactIdIndex < 0 || nameIndex < 0 || numberIndex < 0) {
+                        Log.w(TAG, "Required columns not found for exact match")
+                        return@use
+                    }
 
-                    return Contact(
+                    val contact = Contact(
                         id = c.getLong(contactIdIndex),
                         name = c.getString(nameIndex) ?: "Unknown",
                         phoneNumber = c.getString(numberIndex) ?: original,
-                        phoneType = getPhoneTypeLabel(c.getInt(typeIndex)),
-                        photoUri = c.getString(photoIndex),
+                        phoneType = if (typeIndex >= 0) getPhoneTypeLabel(c.getInt(typeIndex)) else "Unknown",
+                        photoUri = if (photoIndex >= 0) c.getString(photoIndex) else null,
                         isFrequentContact = false
                     )
+                    contactCache[cacheKey] = contact // Cache the result
+                    return@withContext contact
                 }
             }
 
@@ -233,7 +320,7 @@ class ContactManager @Inject constructor(
                     val idIdx = c.getColumnIndex(ContactsContract.PhoneLookup._ID)
                     val nameIdx = c.getColumnIndex(ContactsContract.PhoneLookup.DISPLAY_NAME)
                     val numberIdx = c.getColumnIndex(ContactsContract.PhoneLookup.NUMBER)
-                    return Contact(
+                    val contact = Contact(
                         id = if (idIdx >= 0) c.getLong(idIdx) else 0,
                         name = if (nameIdx >= 0) c.getString(nameIdx) ?: original else original,
                         phoneNumber = if (numberIdx >= 0) c.getString(numberIdx) ?: original else original,
@@ -241,6 +328,8 @@ class ContactManager @Inject constructor(
                         photoUri = null,
                         isFrequentContact = false
                     )
+                    contactCache[cacheKey] = contact // Cache the result
+                    return@withContext contact
                 }
             }
 
@@ -267,31 +356,39 @@ class ContactManager @Inject constructor(
                         val numberIndex = c.getColumnIndex(ContactsContract.CommonDataKinds.Phone.NUMBER)
                         val typeIndex = c.getColumnIndex(ContactsContract.CommonDataKinds.Phone.TYPE)
                         val photoIndex = c.getColumnIndex(ContactsContract.CommonDataKinds.Phone.PHOTO_URI)
+                        
+                        // Check for valid column indices
+                        if (contactIdIndex < 0 || nameIndex < 0 || numberIndex < 0) {
+                            Log.w(TAG, "Required columns not found for last-10 match")
+                            return@use
+                        }
 
-                        return Contact(
+                        val contact = Contact(
                             id = c.getLong(contactIdIndex),
                             name = c.getString(nameIndex) ?: "Unknown",
                             phoneNumber = c.getString(numberIndex) ?: original,
-                            phoneType = getPhoneTypeLabel(c.getInt(typeIndex)),
-                            photoUri = c.getString(photoIndex),
+                            phoneType = if (typeIndex >= 0) getPhoneTypeLabel(c.getInt(typeIndex)) else "Unknown",
+                            photoUri = if (photoIndex >= 0) c.getString(photoIndex) else null,
                             isFrequentContact = false
                         )
+                        contactCache[cacheKey] = contact // Cache the result
+                        return@withContext contact
                     }
                 }
             }
+            // If we reach here, contact was not found
+            Log.d(TAG, "No contact found for: $phoneNumber")
+            contactCache[cacheKey] = null // Cache the negative result
+            return@withContext null
+        } catch (e: SecurityException) {
+            Log.e(TAG, "Security exception in contact lookup", e)
+            contactCache[cacheKey] = null
+            return@withContext null
         } catch (e: Exception) {
             Log.e(TAG, "Failed to get contact by phone number", e)
+            contactCache[cacheKey] = null
+            return@withContext null
         }
-        
-        // Return a basic contact if not found in contacts
-        return Contact(
-            id = 0,
-            name = phoneNumber,
-            phoneNumber = phoneNumber,
-            phoneType = "Unknown",
-            photoUri = null,
-            isFrequentContact = false
-        )
     }
     
     private fun formatPhoneNumber(phoneNumber: String): String {
@@ -321,16 +418,11 @@ class ContactManager @Inject constructor(
     }
     
     /**
-     * Normalizes phone number for consistent comparison
-     * Removes all non-digit characters except + at the beginning
+     * Normalizes phone number for consistent comparison.
+     * Delegates to the unified normalization function in companion object.
      */
     private fun normalizePhoneNumber(phoneNumber: String): String {
-        val cleaned = phoneNumber.trim()
-        return if (cleaned.startsWith("+")) {
-            "+" + cleaned.substring(1).replace(Regex("[^0-9]"), "")
-        } else {
-            cleaned.replace(Regex("[^0-9]"), "")
-        }
+        return normalizePhoneNumberForLookup(phoneNumber)
     }
 }
 

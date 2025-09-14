@@ -53,12 +53,12 @@ class PrivateContextualClassifier @Inject constructor(
      * Main classification method with contextual analysis
      * ALL PROCESSING HAPPENS ON-DEVICE
      */
-    fun classifyWithContext(
+    suspend fun classifyWithContext(
         message: SmsMessage,
         recentMessages: List<SmsMessage> = emptyList(),
         updateContext: Boolean = true  // Allow disabling context updates for explanation queries
     ): MessageClassification {
-        val preferences = runBlocking { preferencesFlow.first() }
+        val preferences = preferencesFlow.first()
         
         // Build context from recent messages (on-device only)
         val context = buildLocalContext(message, recentMessages)

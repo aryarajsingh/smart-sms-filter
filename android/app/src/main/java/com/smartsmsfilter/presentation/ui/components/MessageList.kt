@@ -49,7 +49,11 @@ fun MessageList(
             modifier = modifier.fillMaxSize(),
             contentPadding = PaddingValues(vertical = 8.dp)
         ) {
-            items(messages) { message ->
+            items(
+                items = messages,
+                key = { message -> message.id },
+                contentType = { "message_item" }
+            ) { message ->
                 MessageItem(
                     message = message,
                     onClick = { onMessageClick(message) },
@@ -67,7 +71,7 @@ private fun MessageItem(
     onClick: () -> Unit,
     onMoveToCategory: (MessageCategory) -> Unit
 ) {
-    var showMenu by remember { mutableStateOf(false) }
+    var showMenu by remember(message.id) { mutableStateOf(false) }
     
     Card(
         modifier = Modifier

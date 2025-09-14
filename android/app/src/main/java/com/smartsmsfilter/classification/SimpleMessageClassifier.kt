@@ -6,7 +6,6 @@ import com.smartsmsfilter.data.preferences.ImportantMessageType
 import com.smartsmsfilter.data.preferences.SpamTolerance
 import com.smartsmsfilter.domain.model.MessageCategory
 import kotlinx.coroutines.flow.first
-import kotlinx.coroutines.runBlocking
 import javax.inject.Inject
 import javax.inject.Singleton
 
@@ -85,8 +84,13 @@ class SimpleMessageClassifier @Inject constructor(
      * Classify a message based on user preferences from onboarding
      */
     suspend fun classifyMessage(sender: String, content: String): MessageCategory {
-        val preferences = preferencesFlow.first()
-        return classifyWithPreferences(sender, content, preferences)
+        return try {
+            val preferences = preferencesFlow.first()
+            classifyWithPreferences(sender, content, preferences)
+        } catch (e: Exception) {
+            // Fallback to INBOX on error (safer than spam or review)
+            MessageCategory.INBOX
+        }
     }
     
     /**
@@ -109,6 +113,11 @@ class SimpleMessageClassifier @Inject constructor(
         content: String, 
         preferences: com.smartsmsfilter.data.preferences.UserPreferences
     ): MessageCategory {
+        // Guard against empty strings
+        if (sender.isBlank() && content.isBlank()) {
+            return MessageCategory.SPAM
+        }
+        
         val contentLower = content.lowercase()
         val senderUpper = sender.uppercase()
 
@@ -192,13 +201,25 @@ class SimpleMessageClassifier @Inject constructor(
     }
 
     private fun isOtp(content: String): Boolean {
-        return ClassificationConstants.OTP_REGEXES.any { Regex(it, RegexOption.IGNORE_CASE).containsMatchIn(content) }
+        return try {
+            ClassificationConstants.OTP_REGEXES.any { 
+                Regex(it, RegexOption.IGNORE_CASE).containsMatchIn(content) 
+            }
+        } catch (e: Exception) {
+            // If regex fails, check for simple patterns
+            content.lowercase().contains("otp") || 
+            content.lowercase().contains("verification") ||
+            content.lowercase().contains("code")
+        }
     }
 
     private fun isPhoneNumber(sender: String): Boolean {
         // Simple check for phone number format
-        return sender.replace(Regex("[+\\-\\s()]"), "").all { it.isDigit() } && 
-               sender.replace(Regex("[+\\-\\s()]"), "").length >= 10
+        if (sender.isBlank()) return false
+        val digitsOnly = sender.replace(Regex("[+\\-\\s()]"), "")
+        return digitsOnly.isNotEmpty() && 
+               digitsOnly.all { it.isDigit() } && 
+               digitsOnly.length >= 10
     }
     
     /**
@@ -235,7 +256,11 @@ class SimpleMessageClassifier @Inject constructor(
         
         // Links (promotional often include links)
         if (contentLower.contains("http")) score += 15
-        if (ClassificationConstants.SHORT_LINK_DOMAINS.any { contentLower.contains(it) }) score += 10
+        try {
+            if (ClassificationConstants.SHORT_LINK_DOMAINS.any { contentLower.contains(it) }) score += 10
+        } catch (e: Exception) {
+            // If check fails, ignore it
+        }
         
         return minOf(score, 100) // Cap at 100
     }

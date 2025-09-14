@@ -12,11 +12,13 @@
     
     <!-- Contact permissions -->
     <uses-permission android:name="android.permission.READ_CONTACTS" />
-    <uses-permission android:name="android.permission.WRITE_CONTACTS" />
+    <!-- Write contacts permission removed - not needed -->
     
-    <!-- Storage permissions for media -->
-    <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE" />
-    <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE" />
+    <!-- Storage permissions for media (deprecated in Android 13+) -->
+    <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE" 
+        android:maxSdkVersion="32" />
+    <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE" 
+        android:maxSdkVersion="29" />
     
     <!-- Network for MMS -->
     <uses-permission android:name="android.permission.INTERNET" />
@@ -29,7 +31,6 @@
     
     <!-- Services -->
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
-    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_DATA_SYNC" />
     
     <!-- Hardware features -->
     <uses-feature android:name="android.hardware.telephony" android:required="false" />
